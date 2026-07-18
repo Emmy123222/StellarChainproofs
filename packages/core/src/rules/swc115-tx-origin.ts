@@ -24,19 +24,24 @@ export function detectTxOrigin(
       (m) => m.kind === "function" || m.kind === "modifier",
     ) ?? [];
 
-  const functionsToCheck: Array<{ member?: MergedMember; node: ASTNode; source: string }> =
-    members.length > 0
-      ? members.map((m) => ({ member: m, node: m.node, source: m.source }))
-      : [{ node: ast, source }];
-
-  for (const { member, node, source: memberSource } of functionsToCheck) {
-    visit(node, {
-      MemberAccess(inner: ASTNode) {
-        const finding = checkTxOriginNode(inner, memberSource, filePath, member, options);
-        if (finding) findings.push(finding);
-      },
-    });
-  }
+  if (options?.contractView) {
+    for (const member of options.contractView.members) {
+      if (member.kind === "modifier" || member.kind === "function") {
+        visit(member.node, {
+          MemberAccess(node: ASTNode) {
+            const finding = checkTxOriginNode(
+              node,
+              member.source,
+              filePath,
+              member,
+              options
+            );
+            if (finding) findings.push(finding);
+          },
+        });
+      }
+    },
+  });
 
   return findings;
 }

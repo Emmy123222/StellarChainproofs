@@ -1,7 +1,6 @@
 import { visit, getSnippet } from "../ast/parser";
 import type { MergedMember } from "../ast/import-graph";
-import type { Finding } from "../types";
-import type { ASTNode } from "../ast/parser";
+import type { Finding, ASTNode } from "../types";
 import { applyFindingContext, type RuleOptions } from "./rule-context";
 
 /**
