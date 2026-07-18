@@ -1,0 +1,20 @@
+{
+  "name": "chainproof-hardhat-example",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "chainproof": "hardhat chainproof",
+    "chainproof:check": "hardhat chainproof:check",
+    "chainproof:report": "hardhat chainproof:report --format markdown --output audit.md"
+  },
+  "devDependencies": {
+    "@chainproof/core": "file:../../packages/core",
+    "@chainproof/hardhat-plugin": "file:../../packages/hardhat-plugin",
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "hardhat": "^2.22.0",
+    "typescript": "^5.4.0",
+    "ts-node": "^10.9.2"
+  }
+}

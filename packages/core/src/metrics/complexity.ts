@@ -1,4 +1,4 @@
-import type { ASTNode } from "../ast/parser";
+import type { ASTNode } from "../types";
 import { visit } from "../ast/parser";
 
 // ─── Public API ───────────────────────────────────────────────────────────────
