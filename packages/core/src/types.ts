@@ -1,9 +1,18 @@
 // ─── Severity Levels ──────────────────────────────────────────────────────────
 
+/**
+ * Severity level of a detected finding.
+ *
+ * Ordered from most to least severe:
+ * `critical` > `high` > `medium` > `low` > `info` > `gas`
+ */
 export type Severity = "critical" | "high" | "medium" | "low" | "info" | "gas";
 
 // ─── A single detected issue ──────────────────────────────────────────────────
 
+/**
+ * A single security, quality, or gas finding detected in a Solidity file.
+ */
 export interface Finding {
   /** Unique rule ID e.g. "SWC-107" */
   id: string;
@@ -35,6 +44,9 @@ export interface Finding {
 
 // ─── Gas optimization hint ────────────────────────────────────────────────────
 
+/**
+ * A gas optimization suggestion for a specific line in a Solidity file.
+ */
 export interface GasHint {
   file: string;
   line: number;
@@ -45,6 +57,9 @@ export interface GasHint {
 
 // ─── Scan result for a single file ───────────────────────────────────────────
 
+/**
+ * Scan findings and metadata for a single Solidity file.
+ */
 export interface FileScanResult {
   file: string;
   findings: Finding[];
@@ -56,11 +71,19 @@ export interface FileScanResult {
 
 // ─── Complexity / Maintainability Metrics ──────────────────────────────────────
 
+/**
+ * Describes a function with cyclomatic complexity above the threshold (>10).
+ */
 export interface HighComplexityFunction {
   name: string;
   cc: number;
 }
 
+/**
+ * Complexity and maintainability metrics for a single contract.
+ *
+ * Produced when {@link ScanConfig.useMetrics} is `true`.
+ */
 export interface ContractMetrics {
   contract: string;
   file: string;
@@ -77,6 +100,11 @@ export interface ContractMetrics {
 
 // ─── Full scan result for a project ──────────────────────────────────────────
 
+/**
+ * The complete result of a {@link scan} call.
+ *
+ * Contains per-file findings, an aggregate summary, and optional metrics.
+ */
 export interface ScanResult {
   version: string;
   timestamp: string;
@@ -97,8 +125,31 @@ export interface ScanResult {
 
 // ─── Plugin API ──────────────────────────────────────────────────────────────
 
+/**
+ * Opaque AST node from `@solidity-parser/parser`.
+ *
+ * Used as the input type for plugin `detect` functions and internal AST visitors.
+ */
 export type ASTNode = any; // From @solidity-parser/parser
 
+/**
+ * A single rule contributed by a {@link ChainProofPlugin}.
+ *
+ * @example
+ * ```typescript
+ * const myRule: PluginRule = {
+ *   id: 'MYTEAM-001',
+ *   title: 'Unsafe delegatecall',
+ *   severity: 'high',
+ *   description: 'delegatecall to user-controlled address.',
+ *   recommendation: 'Validate the callee address against an allowlist.',
+ *   detect(ast, source, filePath) {
+ *     // return Finding[] based on AST analysis
+ *     return [];
+ *   },
+ * };
+ * ```
+ */
 export interface PluginRule {
   /** Unique rule ID e.g. "MYTEAM-001" */
   id: string;
@@ -113,6 +164,21 @@ export interface PluginRule {
   detect: (ast: ASTNode, source: string, filePath: string) => Finding[];
 }
 
+/**
+ * A ChainProof plugin that contributes one or more custom detection rules.
+ *
+ * Plugins can be loaded from npm packages or local files via {@link loadPlugin}
+ * and {@link loadPlugins}, then passed to {@link scan} via {@link ScanConfig.plugins}.
+ *
+ * @example
+ * ```typescript
+ * const plugin: ChainProofPlugin = {
+ *   name: 'my-team-rules',
+ *   version: '1.0.0',
+ *   rules: [myRule],
+ * };
+ * ```
+ */
 export interface ChainProofPlugin {
   name: string;
   version: string;
@@ -121,6 +187,32 @@ export interface ChainProofPlugin {
 
 // ─── Scanner config ───────────────────────────────────────────────────────────
 
+/**
+ * Configuration for a {@link scan} call.
+ *
+ * @example Minimal scan
+ * ```typescript
+ * const config: ScanConfig = {
+ *   targets: ['contracts/'],
+ *   useSlither: false,
+ *   useLLM: false,
+ *   useMetrics: false,
+ * };
+ * ```
+ *
+ * @example Full scan with all features
+ * ```typescript
+ * const config: ScanConfig = {
+ *   targets: ['contracts/'],
+ *   useSlither: true,
+ *   useLLM: true,
+ *   useMetrics: true,
+ *   apiKey: process.env.ANTHROPIC_API_KEY,
+ *   minSeverity: 'medium',
+ *   outputFormat: 'markdown',
+ * };
+ * ```
+ */
 export interface ScanConfig {
   /** Paths to .sol files or directories */
   targets: string[];
