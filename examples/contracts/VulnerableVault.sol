@@ -9,7 +9,8 @@ pragma solidity ^0.7.6;
  * DO NOT deploy this to any network.
  *
  * Vulnerabilities present:
- *   - SWC-107: Reentrancy in withdraw()
+ *   - SWC-107: Reentrancy in withdraw() [intra-function]
+ *   - SWC-107-X: Cross-function reentrancy via withdraw() -> getBonus()
  *   - SWC-115: tx.origin authentication in transferOwnership()
  *   - SWC-101: Integer overflow (pragma <0.8, no SafeMath)
  *   - SWC-104: Unchecked return value in sendReward()
@@ -60,6 +61,14 @@ contract VulnerableVault {
         // ❌ .send() return value ignored — failure is silently swallowed
         recipient.call{value: rewardPool}("");
         rewardPool = 0;
+    }
+
+    // SWC-107-X: Cross-function reentrancy
+    // This function reads balances[] which can be stale if re-entered during withdraw()
+    // Attacker calls withdraw() -> msg.sender.call() -> reenter getBonus() -> reads stale balances
+    function getBonus() external view returns (uint256) {
+        // ❌ Reads stale state if re-entered during withdraw() before balances[msg.sender] -= amount
+        return balances[msg.sender] / 10;
     }
 
     // SWC-115: tx.origin used for ownership transfer

@@ -4,10 +4,10 @@ import type { Finding, ASTNode } from "../types";
 import { applyFindingContext, type RuleOptions } from "./rule-context";
 
 /**
- * SWC-107: Reentrancy
+ * SWC-107: Reentrancy (Intra-function variant)
  *
- * Flags functions that make external calls before updating state variables.
- * Operates on merged contract views to catch inherited vulnerable functions.
+ * Flags functions that make external calls before updating state variables
+ * within the same function body. This catches the classic DAO-style reentrancy.
  */
 export function detectReentrancy(
   ast: ASTNode,
@@ -16,7 +16,9 @@ export function detectReentrancy(
   options?: RuleOptions,
 ): Finding[] {
   const findings: Finding[] = [];
-  const members = options?.contractView?.members.filter((m) => m.kind === "function") ?? [];
+
+  const contractView = ruleOptions?.contractView;
+  const members = contractView?.members.filter((m) => m.kind === "function") ?? [];
 
   const functionsToCheck: Array<{ member?: MergedMember; node: ASTNode; source: string }> =
     members.length > 0
@@ -66,8 +68,7 @@ export function detectReentrancy(
       }
     });
 
-    if (stateWriteAfterCall) {
-      const line = fn.loc?.start?.line ?? 0;
+    for (const issue of issues) {
       findings.push(
         applyFindingContext(
           {
@@ -84,12 +85,12 @@ export function detectReentrancy(
               "ReentrancyGuard modifier.",
             severity: "critical",
             file: filePath,
-            line,
-            snippet: getSnippet(memberSource, node),
+            line: issue.line,
+            snippet: issue.snippet,
           },
           member,
-          options?.contractView
-        )
+          contractView,
+        ),
       );
     }
   }
@@ -97,9 +98,56 @@ export function detectReentrancy(
   return findings;
 }
 
+function checkFunctionForReentrancy(
+  statements: ASTNode[],
+  fn: { name?: string; loc?: { start?: { line?: number } } },
+  source: string,
+  memberSource: string,
+  node: ASTNode,
+): Array<{ line: number; snippet: string }> {
+  const issues: Array<{ line: number; snippet: string }> = [];
+
+  let externalCallIdx = -1;
+
+  for (let i = 0; i < statements.length; i++) {
+    const stmt = statements[i];
+    const stmtStr = JSON.stringify(stmt);
+
+    // Detect external calls (call, transfer, send with value)
+    const isExternalCall =
+      stmtStr.includes('"call"') ||
+      stmtStr.includes('"transfer"') ||
+      stmtStr.includes('"send"') ||
+      (stmtStr.includes('"value"') && stmtStr.includes('"MemberAccess"'));
+
+    if (isExternalCall) {
+      externalCallIdx = i;
+    }
+
+    // Detect state variable write after an external call
+    if (
+      externalCallIdx !== -1 &&
+      i > externalCallIdx &&
+      (stmt as { type?: string }).type === "ExpressionStatement"
+    ) {
+      const exprStr = JSON.stringify(stmt);
+      // Heuristic: assignment after call
+      if (exprStr.includes('"operator":"="') || exprStr.includes('"operator":"-="')) {
+        const line = (stmt as { loc?: { start?: { line?: number } } }).loc?.start?.line ?? fn.loc?.start?.line ?? 0;
+        issues.push({
+          line,
+          snippet: getSnippet(memberSource, stmt),
+        });
+      }
+    }
+  }
+
+  return issues;
+}
+
 function collectLocalFunctions(
   ast: ASTNode,
-  source: string
+  source: string,
 ): Array<{ member?: undefined; node: ASTNode; source: string }> {
   const functions: Array<{ member?: undefined; node: ASTNode; source: string }> = [];
   visit(ast, {

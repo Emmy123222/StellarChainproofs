@@ -40,6 +40,8 @@ export interface Finding {
   inheritedBy?: string;
   /** Resolved import chain from inheriting file to definition file */
   importPath?: string[];
+  /** Call path showing the vulnerable execution trace (e.g., ["withdraw", "_updateBalance"]) */
+  callPath?: string[];
 }
 
 // ─── Gas optimization hint ────────────────────────────────────────────────────

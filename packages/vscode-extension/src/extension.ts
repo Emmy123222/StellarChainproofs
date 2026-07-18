@@ -7,8 +7,10 @@ import {
   generateMarkdownReport,
   isSlitherAvailable,
   loadPlugins,
+  clearCache,
+  astCache,
 } from "@chainproof/core";
-import type { Finding, GasHint, ScanConfig } from "@chainproof/core";
+import type { Finding, GasHint, ScanConfig, ASTCacheEntry } from "@chainproof/core";
 
 // ─── Severity → VS Code DiagnosticSeverity ───────────────────────────────────
 
@@ -42,6 +44,7 @@ const lastScanFindings = new Map<string, Finding[]>();
 // ─── Activation ───────────────────────────────────────────────────────────────
 
 export function activate(context: vscode.ExtensionContext) {
+  _extensionContext = context;
   outputChannel = vscode.window.createOutputChannel("ChainProof");
   diagnosticCollection =
     vscode.languages.createDiagnosticCollection("chainproof");
@@ -151,9 +154,53 @@ export function activate(context: vscode.ExtensionContext) {
     .filter((d) => d.fileName.endsWith(".sol"))
     .forEach((d) => scanDocument(d));
 
+  // Restore AST cache from previous session.
+  loadPersistedCache(context);
+
+  // Register clearCache command so users can purge manually.
+  context.subscriptions.push(
+    vscode.commands.registerCommand("chainproof.clearASTCache", () => {
+      clearCache();
+      outputChannel.appendLine("[ChainProof] AST cache cleared.");
+      vscode.window.showInformationMessage("ChainProof: AST cache cleared.");
+    }),
+  );
+
   outputChannel.appendLine(
     "[ChainProof] Extension activated. Ready to scan Solidity files.",
   );
+}
+
+const CACHE_FILENAME = "ast-cache.json";
+
+function cacheStoragePath(context: vscode.ExtensionContext): string {
+  return path.join(context.globalStorageUri.fsPath, CACHE_FILENAME);
+}
+
+function loadPersistedCache(context: vscode.ExtensionContext): void {
+  const cachePath = cacheStoragePath(context);
+  try {
+    if (fs.existsSync(cachePath)) {
+      const raw = fs.readFileSync(cachePath, "utf-8");
+      const entries: ASTCacheEntry[] = JSON.parse(raw);
+      astCache.hydrate(entries);
+      outputChannel.appendLine(
+        `[ChainProof] Restored ${entries.length} AST cache entries from previous session.`,
+      );
+    }
+  } catch {
+    // Corrupted cache — start fresh.
+  }
+}
+
+function persistCache(context: vscode.ExtensionContext): void {
+  const cachePath = cacheStoragePath(context);
+  try {
+    fs.mkdirSync(context.globalStorageUri.fsPath, { recursive: true });
+    fs.writeFileSync(cachePath, JSON.stringify(astCache.serialize()), "utf-8");
+  } catch {
+    // Non-fatal — cache will be rebuilt on next session.
+  }
 }
 
 // ─── Scan a single TextDocument ───────────────────────────────────────────────
@@ -895,7 +942,12 @@ function renderMarkdown(text: string): string {
     .replace(/\n/g, "<br>");
 }
 
+let _extensionContext: vscode.ExtensionContext | undefined;
+
 export function deactivate() {
+  if (_extensionContext) {
+    persistCache(_extensionContext);
+  }
   diagnosticCollection?.dispose();
   statusBarItem?.dispose();
   outputChannel?.dispose();

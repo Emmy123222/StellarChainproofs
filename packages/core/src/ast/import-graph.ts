@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import type { ASTNode } from "./parser";
+import type { ASTNode } from "../types";
 import { parseSolidity, visit } from "./parser";
 
 export interface ParsedSolidityFile {

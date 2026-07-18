@@ -19,6 +19,8 @@
 // ─── Public stable exports ────────────────────────────────────────────────────
 
 export { scan } from "./scanner";
+export { clearCache, astCache } from "./ast/cache";
+export type { ASTCacheEntry } from "./ast/cache";
 export {
   generateMarkdownReport,
   generateJSONReport,

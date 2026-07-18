@@ -10,12 +10,14 @@ import {
 } from "./ast/import-graph";
 import { runSlither, isSlitherAvailable } from "./ast/slither";
 import { detectReentrancy } from "./rules/swc107-reentrancy";
+import { detectCrossFunctionReentrancy } from "./rules/swc107-reentrancy-v2";
 import { detectTxOrigin } from "./rules/swc115-tx-origin";
 import { detectUnprotectedUpgrade } from "./rules/swc116-unprotected-upgrade";
 import {
   detectIntegerOverflow,
   detectUncheckedReturn,
 } from "./rules/swc101-overflow";
+import { detectUnprotectedUpgrade } from "./rules/swc116-unprotected-upgrade";
 import { detectGasIssues } from "./rules/gas-optimizer";
 import { enhanceFindingsWithLLM } from "./llm/enhancer";
 import { loadPlugins } from "./plugins";
@@ -66,6 +68,7 @@ function runRulesOnView(
   const ruleOptions = { contractView: view };
   return [
     ...detectReentrancy(view.node, view.source, view.file, ruleOptions),
+    ...detectCrossFunctionReentrancy(view.node, view.source, view.file, ruleOptions),
     ...detectTxOrigin(view.node, view.source, view.file, ruleOptions),
     ...detectUnprotectedUpgrade(view.node, view.source, view.file, ruleOptions),
   ];
