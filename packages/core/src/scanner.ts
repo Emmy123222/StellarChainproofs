@@ -5,10 +5,13 @@ import {
   buildImportGraph,
   buildMergedContractViews,
   hasImportDirectives,
+  type ImportGraph,
+  type MergedContractView,
 } from "./ast/import-graph";
 import { runSlither, isSlitherAvailable } from "./ast/slither";
 import { detectReentrancy } from "./rules/swc107-reentrancy";
 import { detectTxOrigin } from "./rules/swc115-tx-origin";
+import { detectUnprotectedUpgrade } from "./rules/swc116-unprotected-upgrade";
 import {
   detectIntegerOverflow,
   detectUncheckedReturn,
@@ -16,6 +19,7 @@ import {
 import { detectGasIssues } from "./rules/gas-optimizer";
 import { enhanceFindingsWithLLM } from "./llm/enhancer";
 import { loadPlugins } from "./plugins";
+import { analyzeContract } from "./metrics/complexity";
 import type {
   ScanConfig,
   ScanResult,
@@ -55,39 +59,6 @@ function collectSolFiles(targets: string[]): string[] {
   return [...new Set(files)];
 }
 
-/**
- * Expand the file list to include locally resolvable imports.
- */
-function expandWithImports(initialFiles: string[]): string[] {
-  const discovered = new Set(initialFiles.map((f) => path.resolve(f)));
-  const queue = [...discovered];
-
-  while (queue.length > 0) {
-    const absolutePath = queue.shift()!;
-    if (!fs.existsSync(absolutePath)) continue;
-
-    let source: string;
-    try {
-      source = fs.readFileSync(absolutePath, "utf-8");
-    } catch {
-      continue;
-    }
-
-    const { ast } = parseSolidity(source, absolutePath);
-    if (!ast) continue;
-
-    const partialGraph = buildImportGraph([absolutePath]);
-    for (const imported of partialGraph.edges.get(absolutePath) ?? []) {
-      if (!discovered.has(imported) && fs.existsSync(imported)) {
-        discovered.add(imported);
-        queue.push(imported);
-      }
-    }
-  }
-
-  return [...discovered];
-}
-
 function runRulesOnView(
   view: ReturnType<typeof buildMergedContractViews>[number],
   config: ScanConfig
@@ -114,24 +85,38 @@ function runRulesOnFile(
   ];
 }
 
-async function scanFileLegacy(
+async function scanFile(
   filePath: string,
   config: ScanConfig,
+  graph: ImportGraph | null,
+  views: MergedContractView[],
 ): Promise<FileScanResult> {
-  let source: string;
-  try {
-    source = fs.readFileSync(filePath, "utf-8");
-  } catch (e) {
-    return {
-      file: filePath,
-      findings: [],
-      gasHints: [],
-      slitherRan: false,
-      parseError: `Could not read file: ${e}`,
-    };
-  }
+  // Reuse the AST already parsed while building the shared import graph
+  // rather than re-reading and re-parsing the file from disk.
+  const parsedFile = graph?.files.get(filePath);
 
-  const { ast, error } = parseSolidity(source, filePath);
+  let source: string;
+  let ast: ReturnType<typeof parseSolidity>["ast"];
+  let error: string | undefined;
+
+  if (parsedFile) {
+    source = parsedFile.source;
+    ast = parsedFile.ast;
+  } else {
+    try {
+      source = fs.readFileSync(filePath, "utf-8");
+    } catch (e) {
+      return {
+        file: filePath,
+        findings: [],
+        gasHints: [],
+        slitherRan: false,
+        parseError: `Could not read file: ${e}`,
+      };
+    }
+
+    ({ ast, error } = parseSolidity(source, filePath));
+  }
 
   if (!ast) {
     return {
@@ -144,12 +129,16 @@ async function scanFileLegacy(
   }
 
   // ── AST-based rules ────────────────────────────────────────────────────────
-  let findings: Finding[] = [
-    ...detectReentrancy(ast, source, filePath),
-    ...detectTxOrigin(ast, source, filePath),
-    ...detectIntegerOverflow(ast, source, filePath),
-    ...detectUncheckedReturn(ast, source, filePath),
-  ];
+  // Merged contract views catch vulnerabilities inherited from base contracts
+  // via local imports; single-file contracts use the cheaper legacy path.
+  let findings: Finding[] =
+    views.length > 0
+      ? [
+          ...views.flatMap((view) => runRulesOnView(view, config)),
+          ...detectIntegerOverflow(ast, source, filePath),
+          ...detectUncheckedReturn(ast, source, filePath),
+        ]
+      : runRulesOnFile(ast, source, filePath);
 
   // ── Plugin rules ───────────────────────────────────────────────────────────
   if (config.plugins) {
@@ -187,7 +176,7 @@ async function scanFileLegacy(
   }
 
   if (config.useLLM && config.apiKey && findings.length > 0) {
-    findings = await enhanceFindingsWithLLM(findings, source, config.apiKey);
+    findings = await enhanceFindingsWithLLM(findings, source, config);
   }
 
 
@@ -270,11 +259,56 @@ function computeMetricsForFile(
   }));
 }
 
+/**
+ * Scans one or more Solidity files or directories for security vulnerabilities,
+ * gas inefficiencies, and bad patterns.
+ *
+ * Automatically follows and expands local import graphs so inherited
+ * vulnerabilities from base contracts are detected in context.
+ *
+ * @param config - Scan configuration specifying targets, feature flags, and output options
+ * @returns A {@link ScanResult} containing per-file findings and an aggregate summary
+ *
+ * @example
+ * ```typescript
+ * const result = await scan({ targets: ['contracts/'], useSlither: false, useLLM: false, useMetrics: false });
+ * console.log(result.summary.critical); // number of critical findings
+ * ```
+ *
+ * @example With LLM enhancement
+ * ```typescript
+ * const result = await scan({
+ *   targets: ['contracts/Vault.sol'],
+ *   useSlither: true,
+ *   useLLM: true,
+ *   useMetrics: true,
+ *   apiKey: process.env.ANTHROPIC_API_KEY,
+ * });
+ * ```
+ */
 export async function scan(config: ScanConfig): Promise<ScanResult> {
-  const initialFiles = collectSolFiles(config.targets);
-  const files = initialFiles.length > 0 ? expandWithImports(initialFiles) : initialFiles;
+  const initialFiles = collectSolFiles(config.targets).map((f) => path.resolve(f));
+  const graph = initialFiles.length > 0 ? buildImportGraph(initialFiles) : null;
 
-  const fileResults = await Promise.all(files.map((f) => scanFile(f, config)));
+  // Union targeted files with everything the graph discovered (locally
+  // resolvable imports) so unparseable targets still surface a parseError
+  // instead of silently vanishing from the results.
+  const files = graph
+    ? [...new Set([...initialFiles, ...graph.files.keys()])]
+    : initialFiles;
+
+  const views =
+    graph && hasImportDirectives(graph) ? buildMergedContractViews(graph) : [];
+
+  const fileResults = await Promise.all(
+    files.map((f) =>
+      scanFile(f, config, graph, views.filter((v) => v.file === f)),
+    ),
+  );
+
+  const allMetrics: ContractMetrics[] = config.useMetrics
+    ? files.flatMap((f) => computeMetricsForFile(f))
+    : [];
 
   const summary = {
     critical: 0,
