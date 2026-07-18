@@ -17,7 +17,6 @@ import {
   detectIntegerOverflow,
   detectUncheckedReturn,
 } from "./rules/swc101-overflow";
-import { detectUnprotectedUpgrade } from "./rules/swc116-unprotected-upgrade";
 import { detectGasIssues } from "./rules/gas-optimizer";
 import { enhanceFindingsWithLLM } from "./llm/enhancer";
 import { loadPlugins } from "./plugins";

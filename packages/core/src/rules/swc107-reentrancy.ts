@@ -17,7 +17,7 @@ export function detectReentrancy(
 ): Finding[] {
   const findings: Finding[] = [];
 
-  const contractView = ruleOptions?.contractView;
+  const contractView = options?.contractView;
   const members = contractView?.members.filter((m) => m.kind === "function") ?? [];
 
   const functionsToCheck: Array<{ member?: MergedMember; node: ASTNode; source: string }> =
@@ -34,39 +34,7 @@ export function detectReentrancy(
     if (!fn.body?.statements) continue;
 
     const statements = fn.body.statements;
-    let externalCallIdx = -1;
-    let stateWriteAfterCall = false;
-
-    statements.forEach((stmt: ASTNode, i: number) => {
-      const stmtStr = JSON.stringify(stmt);
-
-      const isExternalCall =
-        stmtStr.includes('"call"') ||
-        stmtStr.includes('"transfer"') ||
-        stmtStr.includes('"send"') ||
-        stmtStr.includes('"value"');
-
-      if (isExternalCall && externalCallIdx === -1) {
-        externalCallIdx = i;
-        return;
-      }
-
-      // Detect state variable write after an external call
-      if (
-        externalCallIdx !== -1 &&
-        i > externalCallIdx &&
-        (stmt as { type?: string }).type === "ExpressionStatement"
-      ) {
-        const exprStr = JSON.stringify(stmt);
-        // Heuristic: assignment after call with no msg.sender guard
-        if (
-          exprStr.includes('"operator":"="') ||
-          exprStr.includes('"operator":"-="')
-        ) {
-          stateWriteAfterCall = true;
-        }
-      }
-    });
+    const issues = checkFunctionForReentrancy(statements, fn, memberSource);
 
     for (const issue of issues) {
       findings.push(
@@ -101,9 +69,7 @@ export function detectReentrancy(
 function checkFunctionForReentrancy(
   statements: ASTNode[],
   fn: { name?: string; loc?: { start?: { line?: number } } },
-  source: string,
   memberSource: string,
-  node: ASTNode,
 ): Array<{ line: number; snippet: string }> {
   const issues: Array<{ line: number; snippet: string }> = [];
 

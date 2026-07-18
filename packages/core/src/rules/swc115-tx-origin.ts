@@ -40,3 +40,44 @@ export function detectTxOrigin(
 
   return findings;
 }
+
+function checkTxOriginNode(
+  node: ASTNode,
+  source: string,
+  filePath: string,
+  member?: MergedMember,
+  options?: RuleOptions,
+): Finding | null {
+  const access = node as {
+    memberName?: string;
+    expression?: { name?: string };
+    loc?: { start?: { line?: number } };
+  };
+
+  if (access.memberName !== "origin" || access.expression?.name !== "tx") {
+    return null;
+  }
+
+  const line = access.loc?.start?.line ?? 0;
+  return applyFindingContext(
+    {
+      id: "CP-115",
+      swcId: "SWC-115",
+      title: "Use of tx.origin for authentication",
+      description:
+        "tx.origin refers to the original external account that initiated the transaction, " +
+        "not the immediate caller. A phishing contract can exploit this to perform " +
+        "unauthorized actions on behalf of the victim.",
+      recommendation:
+        "Replace tx.origin with msg.sender for authorization checks. " +
+        "If you need to distinguish EOAs from contracts, use " +
+        "msg.sender == tx.origin as a secondary check, not the primary guard.",
+      severity: "high",
+      file: filePath,
+      line,
+      snippet: getSnippet(source, node),
+    },
+    member,
+    options?.contractView,
+  );
+}
