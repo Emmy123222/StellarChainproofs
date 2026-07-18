@@ -3,13 +3,26 @@ import * as path from "path";
 import type { ChainProofPlugin, PluginRule } from "./types";
 
 /**
- * Load a plugin from a package name or file path.
- * Supports:
- * - npm packages: "@myteam/chainproof-rules"
- * - relative paths: "./local-rules/my-plugin.js"
- * - absolute paths: "/full/path/to/plugin.js"
+ * Load a single plugin from an npm package name or file path.
  *
- * Returns null if plugin fails to load (non-fatal).
+ * Supports:
+ * - npm packages: `"@myteam/chainproof-rules"`
+ * - relative paths: `"./local-rules/my-plugin.js"`
+ * - absolute paths: `"/full/path/to/plugin.js"`
+ *
+ * @param specifier - npm package name or file path to the plugin
+ * @param cwd - Base directory for resolving relative paths (defaults to `process.cwd()`)
+ * @returns The loaded {@link ChainProofPlugin}, or `null` if it failed to load (non-fatal)
+ *
+ * @example
+ * ```typescript
+ * import { loadPlugin } from '@chainproof/core';
+ *
+ * const plugin = loadPlugin('@myteam/chainproof-rules');
+ * if (plugin) {
+ *   console.log(`Loaded ${plugin.rules.length} rules from ${plugin.name}`);
+ * }
+ * ```
  */
 export function loadPlugin(
   specifier: string,
@@ -72,6 +85,21 @@ export function loadPlugin(
 
 /**
  * Load multiple plugins, returning only the ones that loaded successfully.
+ *
+ * Failed plugins are silently skipped with a console warning so a single
+ * bad plugin cannot break the entire scan.
+ *
+ * @param specifiers - Array of npm package names or file paths
+ * @param cwd - Base directory for resolving relative paths
+ * @returns Array of successfully loaded {@link ChainProofPlugin} instances
+ *
+ * @example
+ * ```typescript
+ * import { loadPlugins, scan } from '@chainproof/core';
+ *
+ * const plugins = loadPlugins(['@myteam/chainproof-rules', './custom-rules.js']);
+ * const result = await scan({ targets: ['contracts/'], useSlither: false, useLLM: false, useMetrics: false, plugins });
+ * ```
  */
 export function loadPlugins(
   specifiers: string[],

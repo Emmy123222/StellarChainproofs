@@ -1,7 +1,7 @@
 import { visit, getSnippet } from "../ast/parser";
+import type { MergedMember } from "../ast/import-graph";
 import type { Finding, ASTNode } from "../types";
 import { applyFindingContext, type RuleOptions } from "./rule-context";
-import type { MergedMember } from "../ast/import-graph";
 
 /**
  * SWC-107: Reentrancy (Intra-function variant)
@@ -13,14 +13,14 @@ export function detectReentrancy(
   ast: ASTNode,
   source: string,
   filePath: string,
-  ruleOptions?: RuleOptions,
+  options?: RuleOptions,
 ): Finding[] {
   const findings: Finding[] = [];
 
   const contractView = ruleOptions?.contractView;
   const members = contractView?.members.filter((m) => m.kind === "function") ?? [];
 
-  const functionsToCheck =
+  const functionsToCheck: Array<{ member?: MergedMember; node: ASTNode; source: string }> =
     members.length > 0
       ? members.map((m) => ({ member: m, node: m.node, source: m.source }))
       : collectLocalFunctions(ast, source);
@@ -34,7 +34,39 @@ export function detectReentrancy(
     if (!fn.body?.statements) continue;
 
     const statements = fn.body.statements;
-    const issues = checkFunctionForReentrancy(statements, fn, source, memberSource, node);
+    let externalCallIdx = -1;
+    let stateWriteAfterCall = false;
+
+    statements.forEach((stmt: ASTNode, i: number) => {
+      const stmtStr = JSON.stringify(stmt);
+
+      const isExternalCall =
+        stmtStr.includes('"call"') ||
+        stmtStr.includes('"transfer"') ||
+        stmtStr.includes('"send"') ||
+        stmtStr.includes('"value"');
+
+      if (isExternalCall && externalCallIdx === -1) {
+        externalCallIdx = i;
+        return;
+      }
+
+      // Detect state variable write after an external call
+      if (
+        externalCallIdx !== -1 &&
+        i > externalCallIdx &&
+        (stmt as { type?: string }).type === "ExpressionStatement"
+      ) {
+        const exprStr = JSON.stringify(stmt);
+        // Heuristic: assignment after call with no msg.sender guard
+        if (
+          exprStr.includes('"operator":"="') ||
+          exprStr.includes('"operator":"-="')
+        ) {
+          stateWriteAfterCall = true;
+        }
+      }
+    });
 
     for (const issue of issues) {
       findings.push(

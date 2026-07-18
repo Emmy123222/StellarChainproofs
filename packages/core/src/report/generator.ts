@@ -21,6 +21,24 @@ function sortFindings(findings: Finding[]): Finding[] {
 
 // ─── Markdown Report ──────────────────────────────────────────────────────────
 
+/**
+ * Generates a full Markdown audit report from a scan result.
+ *
+ * Includes an executive summary table, per-file vulnerability findings,
+ * gas optimization hints, and (when available) contract complexity metrics.
+ *
+ * @param result - The {@link ScanResult} returned by {@link scan}
+ * @returns A Markdown string ready to write to a `.md` file or post as a PR comment
+ *
+ * @example
+ * ```typescript
+ * import { scan, generateMarkdownReport } from '@chainproof/core';
+ * import { writeFileSync } from 'fs';
+ *
+ * const result = await scan({ targets: ['contracts/'], useSlither: false, useLLM: false, useMetrics: false });
+ * writeFileSync('audit-report.md', generateMarkdownReport(result));
+ * ```
+ */
 export function generateMarkdownReport(result: ScanResult): string {
   const lines: string[] = [];
   const { summary } = result;
@@ -219,12 +237,42 @@ export function generateMarkdownReport(result: ScanResult): string {
 
 // ─── JSON Report ──────────────────────────────────────────────────────────────
 
+/**
+ * Serializes a scan result to a pretty-printed JSON string.
+ *
+ * The JSON shape matches the {@link ScanResult} interface exactly, making it
+ * suitable for machine consumption, CI artifact storage, or API responses.
+ *
+ * @param result - The {@link ScanResult} returned by {@link scan}
+ * @returns A JSON string (2-space indented)
+ *
+ * @example
+ * ```typescript
+ * const result = await scan({ targets: ['contracts/'], useSlither: false, useLLM: false, useMetrics: false });
+ * process.stdout.write(generateJSONReport(result));
+ * ```
+ */
 export function generateJSONReport(result: ScanResult): string {
   return JSON.stringify(result, null, 2);
 }
 
 // ─── Table (terminal) ─────────────────────────────────────────────────────────
 
+/**
+ * Generates a human-readable, ANSI-coloured table report for terminal output.
+ *
+ * Uses colour coding (red/yellow/green) based on severity. Suitable for
+ * piping to a terminal or CI log output.
+ *
+ * @param result - The {@link ScanResult} returned by {@link scan}
+ * @returns A multi-line string with box-drawing characters and ANSI colours
+ *
+ * @example
+ * ```typescript
+ * const result = await scan({ targets: ['contracts/'], useSlither: false, useLLM: false, useMetrics: false });
+ * console.log(generateTableReport(result));
+ * ```
+ */
 export function generateTableReport(result: ScanResult): string {
   const lines: string[] = [];
   const { summary } = result;

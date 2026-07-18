@@ -34,7 +34,21 @@ function mapImpact(impact: string): Finding["severity"] {
   }
 }
 
-/** Check if slither is available on PATH */
+/**
+ * Returns `true` if the `slither` binary is available on `PATH`.
+ *
+ * Use this to gate optional Slither integration in {@link ScanConfig.useSlither}
+ * before calling {@link scan}.
+ *
+ * @example
+ * ```typescript
+ * import { isSlitherAvailable } from '@chainproof/core';
+ *
+ * if (!isSlitherAvailable()) {
+ *   console.warn('Slither not found — install with: pip install slither-analyzer');
+ * }
+ * ```
+ */
 export function isSlitherAvailable(): boolean {
   try {
     const result = spawnSync("slither", ["--version"], { encoding: "utf-8" });
@@ -48,6 +62,8 @@ export function isSlitherAvailable(): boolean {
  * Run Slither on a Solidity file and return parsed findings.
  * Requires Python and slither-analyzer to be installed:
  *   pip install slither-analyzer
+ *
+ * @internal
  */
 export function runSlither(filePath: string): Finding[] {
   if (!isSlitherAvailable()) return [];

@@ -65,6 +65,7 @@ describe("multi-file scanner integration", () => {
       targets: [upgradeable],
       useSlither: false,
       useLLM: false,
+      useMetrics: false,
     });
 
     const childResult = result.files.find((f) => f.file.includes("UpgradeableVault.sol"));
@@ -83,6 +84,7 @@ describe("multi-file scanner integration", () => {
       targets: [derived],
       useSlither: false,
       useLLM: false,
+      useMetrics: false,
     });
 
     const childResult = result.files.find((f) => f.file.includes("DerivedVault.sol"));
@@ -100,6 +102,7 @@ describe("multi-file scanner integration", () => {
       targets: [derived],
       useSlither: false,
       useLLM: false,
+      useMetrics: false,
     });
 
     const childResult = result.files.find((f) => f.file.includes("DerivedVault.sol"));
@@ -114,14 +117,14 @@ describe("multi-file scanner integration", () => {
     );
 
     const warmUp = async () => {
-      await scan({ targets: [singleFile], useSlither: false, useLLM: false });
+      await scan({ targets: [singleFile], useSlither: false, useLLM: false, useMetrics: false });
     };
     await warmUp();
 
     const measure = async (iterations: number) => {
       const start = performance.now();
       for (let i = 0; i < iterations; i++) {
-        await scan({ targets: [singleFile], useSlither: false, useLLM: false });
+        await scan({ targets: [singleFile], useSlither: false, useLLM: false, useMetrics: false });
       }
       return performance.now() - start;
     };

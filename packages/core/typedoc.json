@@ -1,0 +1,19 @@
+{
+  "entryPoints": ["src/index.ts"],
+  "out": "../../docs/api",
+  "name": "@chainproof/core API Reference",
+  "readme": "../../README.md",
+  "includeVersion": true,
+  "excludeInternal": true,
+  "excludePrivate": true,
+  "excludeProtected": false,
+  "navigation": {
+    "includeCategories": true,
+    "includeGroups": true
+  },
+  "categorizeByGroup": true,
+  "sort": ["source-order"],
+  "highlightLanguages": ["typescript", "javascript", "json", "bash", "mermaid", "yaml"],
+  "theme": "default",
+  "tsconfig": "tsconfig.json"
+}

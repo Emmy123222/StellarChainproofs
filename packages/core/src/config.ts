@@ -9,8 +9,23 @@ export interface ChainProofConfig {
 }
 
 /**
- * Load .chainproofrc.json from the given directory or a parent directory.
- * Returns the loaded config or null if not found.
+ * Load `.chainproofrc.json` from the given directory or any parent directory
+ * (up to 5 levels).
+ *
+ * @param startDir - Directory to start searching from (defaults to `process.cwd()`)
+ * @returns The parsed config object, or `null` if no config file was found
+ *
+ * @example
+ * ```typescript
+ * import { loadConfigFile, mergePluginsFromConfig, scan } from '@chainproof/core';
+ *
+ * const configFile = loadConfigFile();
+ * const config = mergePluginsFromConfig(
+ *   { targets: ['contracts/'], useSlither: false, useLLM: false, useMetrics: false },
+ *   configFile,
+ * );
+ * const result = await scan(config);
+ * ```
  */
 export function loadConfigFile(
   startDir: string = process.cwd(),
@@ -40,8 +55,14 @@ export function loadConfigFile(
 }
 
 /**
- * Merge plugins from config file into ScanConfig.
- * Command-line plugins (passed in config) take precedence over config-file plugins.
+ * Merges plugins discovered from a `.chainproofrc.json` config file into a
+ * {@link ScanConfig}.
+ *
+ * Plugins already set on `config.plugins` take precedence over file-level plugins.
+ *
+ * @param config - Base scan configuration
+ * @param configFile - Config object loaded by {@link loadConfigFile}, or `null`
+ * @returns A new {@link ScanConfig} with plugins merged in
  */
 export function mergePluginsFromConfig(
   config: ScanConfig,
