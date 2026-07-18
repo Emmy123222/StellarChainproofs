@@ -2,6 +2,8 @@ import * as parser from "@solidity-parser/parser";
 import type { ASTNode } from "../types";
 import { astCache, ASTCache } from "./cache";
 
+export type { ASTNode };
+
 export interface ParseResult {
   ast: ASTNode | null;
   error?: string;
@@ -9,8 +11,13 @@ export interface ParseResult {
 
 /**
  * Parse a Solidity source file into an AST.
- * Returns a cached AST when the file content is unchanged (SHA-256 match).
- * Returns { ast: null, error } on failure instead of throwing.
+ * Returns `{ ast: null, error }` on failure instead of throwing.
+ *
+ * @param source - Raw Solidity source code
+ * @param filePath - File path used for error messages only
+ * @returns A {@link ParseResult} with either a populated `ast` or an `error` string
+ *
+ * @internal Used by scanning rules — prefer {@link scan} for external usage.
  */
 export function parseSolidity(source: string, filePath: string): ParseResult {
   const hash = ASTCache.hashContent(source);
@@ -38,7 +45,12 @@ export function parseSolidity(source: string, filePath: string): ParseResult {
 
 /**
  * Walk an AST, calling visitor callbacks for each node type.
- * Visitor keys are node types e.g. "FunctionDefinition".
+ * Visitor keys are node types e.g. `"FunctionDefinition"`.
+ *
+ * @param ast - A parsed Solidity AST node
+ * @param visitors - Map of node type → visitor callback
+ *
+ * @internal Used by rules and import-graph — prefer {@link scan} for external usage.
  */
 export function visit(
   ast: ASTNode,

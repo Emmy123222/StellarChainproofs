@@ -4,10 +4,23 @@
   "description": "Core scanning engine for ChainProof — AST parsing, vulnerability rules, gas analysis, LLM layer",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "test": "jest"
+    "test": "jest",
+    "docs": "typedoc --options typedoc.json"
   },
   "dependencies": {
     "@solidity-parser/parser": "^0.18.0",
@@ -20,6 +33,7 @@
     "@types/node": "^20.0.0",
     "fast-check": "^4.8.0",
     "jest": "^29.7.0",
-    "ts-jest": "^29.1.0"
+    "ts-jest": "^29.1.0",
+    "typedoc": "^0.26.0"
   }
 }

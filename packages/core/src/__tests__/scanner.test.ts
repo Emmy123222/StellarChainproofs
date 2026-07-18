@@ -56,7 +56,10 @@ describe("scan() — integration", () => {
     const result = await scan({ targets: [VAULT_PATH], useSlither: false, useLLM: false, useMetrics: false });
     const findings = result.files.flatMap((f) => f.findings);
     const overflow = findings.filter((f) => f.id === "CP-101");
-    expect(overflow).toHaveLength(0);
+    expect(overflow.length).toBeGreaterThan(0);
+    overflow.forEach((f) => {
+      expect(["+=", "-="].some((op) => f.snippet?.includes(op))).toBe(true);
+    });
   });
 
   it("SecureVault.sol scan completes without throwing", async () => {

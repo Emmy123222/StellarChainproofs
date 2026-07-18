@@ -18,8 +18,10 @@
 - [Data Model](#data-model)
 - [Configuration](#configuration)
 - [Plugin API](#plugin-api)
+- [API Reference](#api-reference)
 - [Development Guide](#development-guide)
 - [Roadmap](#roadmap)
+- [Changelog](#changelog)
 - [License](#license)
 
 ---
@@ -698,6 +700,61 @@ import type {
 
 ---
 
+## API Reference
+
+Full generated API documentation for `@chainproof/core` — every public function,
+type, and interface with JSDoc descriptions and examples — is published at:
+
+**https://dragoncode-01.github.io/StellarChainproofs/api/**
+
+It is rebuilt automatically from source on every release (see
+[`.github/workflows/docs.yml`](.github/workflows/docs.yml)). To build it
+locally:
+
+```bash
+npm run docs --workspace=packages/core
+# open packages/core/../../docs/api/index.html
+```
+
+`@chainproof/core`'s exports are split into two tiers:
+
+- **Public, stable** — `scan`, `generateMarkdownReport`, `generateJSONReport`,
+  `generateTableReport`, `isSlitherAvailable`, `loadPlugin`, `loadPlugins`,
+  `loadConfigFile`, `mergePluginsFromConfig`, and their associated types
+  (`ScanConfig`, `ScanResult`, `Finding`, `ChainProofPlugin`, `PluginRule`,
+  etc). These follow semantic versioning: breaking changes bump the major
+  version, additive changes bump minor, fixes bump patch.
+- **Internal** — helpers like `parseSolidity`, `visit`, and `runSlither` are
+  tagged `@internal` and excluded from the generated reference. They are
+  implementation details of the rule engine and may change without notice
+  between minor versions.
+
+Deprecated public APIs are marked with `@deprecated` in a minor release and
+removed no earlier than the next major release — see the
+[Changelog](#changelog) for specifics.
+
+### Quick start
+
+```typescript
+import { scan, generateMarkdownReport } from "@chainproof/core";
+
+const result = await scan({
+  targets: ["contracts/"],
+  useSlither: false,
+  useLLM: false,
+  useMetrics: false,
+});
+
+console.log(result.summary.critical); // number of critical findings
+console.log(generateMarkdownReport(result));
+```
+
+See [Programmatic usage](#programmatic-usage) and [Plugin API](#plugin-api)
+above for more complete examples, including Slither, LLM enhancement, and
+custom rules.
+
+---
+
 ## Development Guide
 
 ### Build and test
@@ -774,6 +831,14 @@ export function detectMyRule(
 - [ ] SARIF output for GitHub Security tab
 - [ ] Web dashboard with project-level history
 - [ ] Support for Vyper
+
+---
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for the full release history. This project
+follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 

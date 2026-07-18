@@ -2,7 +2,6 @@ import { visit, getSnippet } from "../ast/parser";
 import type { MergedMember } from "../ast/import-graph";
 import type { Finding, ASTNode } from "../types";
 import { applyFindingContext, type RuleOptions } from "./rule-context";
-import type { MergedMember } from "../ast/import-graph";
 
 /**
  * SWC-115: Authorization through tx.origin
@@ -17,9 +16,13 @@ export function detectTxOrigin(
   ast: ASTNode,
   source: string,
   filePath: string,
-  ruleOptions?: RuleOptions,
+  options?: RuleOptions,
 ): Finding[] {
   const findings: Finding[] = [];
+  const members =
+    options?.contractView?.members.filter(
+      (m) => m.kind === "function" || m.kind === "modifier",
+    ) ?? [];
 
   if (options?.contractView) {
     for (const member of options.contractView.members) {
