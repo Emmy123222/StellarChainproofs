@@ -1,10 +1,11 @@
 import * as fs from "fs";
 import * as path from "path";
 import { loadPlugins } from "./plugins";
-import type { ScanConfig, ChainProofPlugin } from "./types";
+import type { ScanConfig, SlitherConfig } from "./types";
 
 export interface ChainProofConfig {
   plugins?: string[];
+  slither?: SlitherConfig;
   [key: string]: unknown;
 }
 
@@ -77,5 +78,41 @@ export function mergePluginsFromConfig(
   return {
     ...config,
     plugins: filePlugins,
+  };
+}
+
+/**
+ * Merges Slither detector allowlist/denylist settings from a
+ * `.chainproofrc.json` config file into a {@link ScanConfig}.
+ *
+ * `config.slither` already set takes precedence over the file's `slither` block.
+ *
+ * @param config - Base scan configuration
+ * @param configFile - Config object loaded by {@link loadConfigFile}, or `null`
+ * @returns A new {@link ScanConfig} with `slither` merged in
+ *
+ * @example
+ * ```typescript
+ * import { loadConfigFile, mergeSlitherConfigFromConfig, scan } from '@chainproof/core';
+ *
+ * const configFile = loadConfigFile();
+ * const config = mergeSlitherConfigFromConfig(
+ *   { targets: ['contracts/'], useSlither: true, useLLM: false, useMetrics: false },
+ *   configFile,
+ * );
+ * const result = await scan(config);
+ * ```
+ */
+export function mergeSlitherConfigFromConfig(
+  config: ScanConfig,
+  configFile?: ChainProofConfig | null,
+): ScanConfig {
+  if (!configFile?.slither || config.slither) {
+    return config;
+  }
+
+  return {
+    ...config,
+    slither: configFile.slither,
   };
 }

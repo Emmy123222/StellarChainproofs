@@ -22,6 +22,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub Actions workflow (`.github/workflows/docs.yml`) that publishes the API
   reference to GitHub Pages on every release.
 - This changelog, backfilled with the project's notable history.
+- Comprehensive Slither detector registry (`ast/slither-detectors.ts`, 90+
+  detectors) mapping Slither's `check` ids to a title, an SWC cross-reference,
+  and a rule category used for deduplication.
+- Confidence-weighted severity for Slither findings: impact × confidence is
+  now mapped to a ChainProof severity (e.g. High impact/Low confidence →
+  `medium`, not `critical`), instead of impact alone.
+- Improved Slither/built-in deduplication by rule category + normalized file +
+  line-range overlap, replacing the old exact line+title match — catches
+  cases like built-in `CP-107` and Slither's `reentrancy-eth` firing on the
+  same lines with different titles, and Slither reporting the same issue once
+  per inheritance level.
+- `ScanConfig.slither.detectors.include` / `.exclude` to allowlist/denylist
+  specific Slither detectors, plus `mergeSlitherConfigFromConfig()` to read
+  the same setting from `.chainproofrc.json`. Omitting `slither` runs every
+  detector, unchanged from prior behavior.
 
 ### Fixed
 

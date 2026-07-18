@@ -28,7 +28,11 @@ export {
 } from "./report/generator";
 export { isSlitherAvailable } from "./ast/slither";
 export { loadPlugin, loadPlugins } from "./plugins";
-export { loadConfigFile, mergePluginsFromConfig } from "./config";
+export {
+  loadConfigFile,
+  mergePluginsFromConfig,
+  mergeSlitherConfigFromConfig,
+} from "./config";
 export type { ChainProofConfig } from "./config";
 
 // ─── Public types ─────────────────────────────────────────────────────────────
@@ -45,6 +49,8 @@ export type {
   ASTNode,
   ContractMetrics,
   HighComplexityFunction,
+  SlitherConfig,
+  SlitherDetectorConfig,
 } from "./types";
 
 export type {
