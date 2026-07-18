@@ -187,6 +187,43 @@ export interface ChainProofPlugin {
   rules: PluginRule[];
 }
 
+// ─── Slither detector configuration ──────────────────────────────────────────
+
+/**
+ * Allowlist/denylist for Slither's built-in detectors, by `check` id
+ * (e.g. `"reentrancy-eth"`, `"assembly"`). See the
+ * [Slither detector documentation](https://github.com/crytic/slither/wiki/Detector-Documentation)
+ * for the full list of check ids.
+ *
+ * When `include` is non-empty, only those detectors run and `exclude` is
+ * ignored. When only `exclude` is set, every detector runs except those
+ * listed. Omitting both runs every detector — identical to prior behavior.
+ */
+export interface SlitherDetectorConfig {
+  /** Run only these detectors. Takes precedence over `exclude`. */
+  include?: string[];
+  /** Skip these detectors; every other detector still runs. */
+  exclude?: string[];
+}
+
+/**
+ * Configuration for the optional Slither integration.
+ *
+ * @example Silence noisy detectors on known-safe inline assembly
+ * ```typescript
+ * const config: ScanConfig = {
+ *   targets: ['contracts/'],
+ *   useSlither: true,
+ *   useLLM: false,
+ *   useMetrics: false,
+ *   slither: { detectors: { exclude: ['assembly', 'low-level-calls'] } },
+ * };
+ * ```
+ */
+export interface SlitherConfig {
+  detectors?: SlitherDetectorConfig;
+}
+
 // ─── Scanner config ───────────────────────────────────────────────────────────
 
 /**
@@ -242,5 +279,8 @@ export interface ScanConfig {
   outputFormat?: "json" | "markdown" | "table";
   /** Array of plugins to load */
   plugins?: ChainProofPlugin[];
+
+  /** Slither detector allowlist/denylist. No effect unless `useSlither` is `true`. */
+  slither?: SlitherConfig;
 }
 

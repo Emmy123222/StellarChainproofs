@@ -8,7 +8,7 @@ import {
   type ImportGraph,
   type MergedContractView,
 } from "./ast/import-graph";
-import { runSlither, isSlitherAvailable } from "./ast/slither";
+import { runSlither, isSlitherAvailable, mergeSlitherFindings } from "./ast/slither";
 import { detectReentrancy } from "./rules/swc107-reentrancy";
 import { detectCrossFunctionReentrancy } from "./rules/swc107-reentrancy-v2";
 import { detectTxOrigin } from "./rules/swc115-tx-origin";
@@ -163,13 +163,8 @@ async function scanFile(
 
   const slitherRan = config.useSlither && isSlitherAvailable();
   if (slitherRan) {
-    const slitherFindings = runSlither(filePath);
-    const existingKeys = new Set(findings.map((f) => `${f.line}-${f.title}`));
-    for (const sf of slitherFindings) {
-      if (!existingKeys.has(`${sf.line}-${sf.title}`)) {
-        findings.push(sf);
-      }
-    }
+    const slitherFindings = runSlither(filePath, config.slither?.detectors);
+    findings = mergeSlitherFindings(findings, slitherFindings);
   }
 
   if (config.minSeverity) {
