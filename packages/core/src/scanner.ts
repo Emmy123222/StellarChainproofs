@@ -17,6 +17,13 @@ import {
   detectIntegerOverflow,
   detectUncheckedReturn,
 } from "./rules/swc101-overflow";
+import {
+  detectERCStandard,
+  checkERC20Compliance,
+  checkERC721Compliance,
+  checkERC1155Compliance,
+} from "./rules/erc-compliance";
+import { RuleOptions } from "./rules/rule-context";
 import { detectGasIssues } from "./rules/gas-optimizer";
 import { enhanceFindingsWithLLM } from "./llm/enhancer";
 import { analyzeContract } from "./metrics/complexity";
@@ -27,6 +34,7 @@ import type {
   Finding,
   Severity,
   ContractMetrics,
+  ASTNode,
 } from "./types";
 
 const VERSION = "0.1.0";
@@ -59,6 +67,20 @@ function collectSolFiles(targets: string[]): string[] {
   return [...new Set(files)];
 }
 
+function runERCChecks(
+  ast: ASTNode,
+  source: string,
+  filePath: string,
+  options?: RuleOptions
+): Finding[] {
+  const standard = detectERCStandard(ast);
+  if (!standard) return [];
+  if (standard === "ERC20") return checkERC20Compliance(ast, source, filePath, options);
+  if (standard === "ERC721") return checkERC721Compliance(ast, source, filePath, options);
+  if (standard === "ERC1155") return checkERC1155Compliance(ast, source, filePath, options);
+  return [];
+}
+
 function runRulesOnView(
   view: ReturnType<typeof buildMergedContractViews>[number],
   config: ScanConfig
@@ -69,6 +91,9 @@ function runRulesOnView(
     ...detectCrossFunctionReentrancy(view.node, view.source, view.file, ruleOptions),
     ...detectTxOrigin(view.node, view.source, view.file, ruleOptions),
     ...detectUnprotectedUpgrade(view.node, view.source, view.file, ruleOptions),
+    ...detectIntegerOverflow(view.node, view.source, view.file),
+    ...detectUncheckedReturn(view.node, view.source, view.file),
+    ...runERCChecks(view.node, view.source, view.file, ruleOptions),
   ];
 }
 
@@ -83,6 +108,7 @@ function runRulesOnFile(
     ...detectUnprotectedUpgrade(ast, source, filePath),
     ...detectIntegerOverflow(ast, source, filePath),
     ...detectUncheckedReturn(ast, source, filePath),
+    ...runERCChecks(ast, source, filePath),
   ];
 }
 
@@ -90,10 +116,8 @@ async function scanFile(
   filePath: string,
   config: ScanConfig,
   graph?: ImportGraph,
-  views?: ReturnType<typeof buildMergedContractViews>
+  views?: MergedContractView[]
 ): Promise<FileScanResult> {
-  // Reuse the AST already parsed while building the shared import graph
-  // rather than re-reading and re-parsing the file from disk.
   const parsedFile = graph?.files.get(filePath);
 
   let source: string;
@@ -129,23 +153,15 @@ async function scanFile(
     };
   }
 
-  const fileViews = views ? views.filter((v) => v.file === filePath) : [];
   let findings: Finding[] = [];
+  const fileViews = views?.filter((v) => v.file === filePath) ?? [];
 
   if (fileViews.length > 0) {
     for (const view of fileViews) {
       findings.push(...runRulesOnView(view, config));
     }
-    findings.push(...detectIntegerOverflow(ast, source, filePath));
-    findings.push(...detectUncheckedReturn(ast, source, filePath));
   } else {
-    findings = [
-      ...detectReentrancy(ast, source, filePath),
-      ...detectTxOrigin(ast, source, filePath),
-      ...detectUnprotectedUpgrade(ast, source, filePath),
-      ...detectIntegerOverflow(ast, source, filePath),
-      ...detectUncheckedReturn(ast, source, filePath),
-    ];
+    findings.push(...runRulesOnFile(ast, source, filePath));
   }
 
   if (config.plugins) {
@@ -289,7 +305,9 @@ export async function scan(config: ScanConfig): Promise<ScanResult> {
   const graph = buildImportGraph(files);
   const views = buildMergedContractViews(graph);
 
-  const fileResults = await Promise.all(files.map((f) => scanFile(f, config, graph, views)));
+  const fileResults = await Promise.all(
+    files.map((f) => scanFile(f, config, graph, views))
+  );
 
   let allMetrics: ContractMetrics[] = [];
   const complexityFindings: Finding[] = [];

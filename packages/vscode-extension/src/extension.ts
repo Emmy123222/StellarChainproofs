@@ -489,7 +489,7 @@ async function explainVulnerability(uri: vscode.Uri, finding: Finding) {
           targets: [document.fileName],
           useSlither: config.get("useSlither") ?? true,
           useLLM: true,
-          useMetrics: false,
+          useMetrics: config.get("useMetrics") ?? false,
           apiKey,
           minSeverity: config.get("minSeverity") ?? "low",
         };
