@@ -13,6 +13,7 @@ import { detectReentrancy } from "./rules/swc107-reentrancy";
 import { detectCrossFunctionReentrancy } from "./rules/swc107-reentrancy-v2";
 import { detectTxOrigin } from "./rules/swc115-tx-origin";
 import { detectUnprotectedUpgrade } from "./rules/swc116-unprotected-upgrade";
+import { detectFrontRunningMev } from "./rules/cp119-frontrunning";
 import {
   detectIntegerOverflow,
   detectUncheckedReturn,
@@ -69,6 +70,7 @@ function runRulesOnView(
     ...detectCrossFunctionReentrancy(view.node, view.source, view.file, ruleOptions),
     ...detectTxOrigin(view.node, view.source, view.file, ruleOptions),
     ...detectUnprotectedUpgrade(view.node, view.source, view.file, ruleOptions),
+    ...detectFrontRunningMev(view.node, view.source, view.file, ruleOptions),
   ];
 }
 
@@ -81,6 +83,7 @@ function runRulesOnFile(
     ...detectReentrancy(ast, source, filePath),
     ...detectTxOrigin(ast, source, filePath),
     ...detectUnprotectedUpgrade(ast, source, filePath),
+    ...detectFrontRunningMev(ast, source, filePath),
     ...detectIntegerOverflow(ast, source, filePath),
     ...detectUncheckedReturn(ast, source, filePath),
   ];
@@ -88,11 +91,13 @@ function runRulesOnFile(
 
 async function scanFile(
   filePath: string,
-  config: ScanConfig
+  config: ScanConfig,
+  graph?: ImportGraph,
+  contractViews?: MergedContractView[]
 ): Promise<FileScanResult> {
   // Reuse the AST already parsed while building the shared import graph
   // rather than re-reading and re-parsing the file from disk.
-  const parsedFile = graph?.files.get(filePath);
+  const parsedFile = graph?.files.get(path.resolve(filePath));
 
   let source: string;
   let ast: ReturnType<typeof parseSolidity>["ast"];
@@ -127,13 +132,14 @@ async function scanFile(
     };
   }
 
-  let findings: Finding[] = [
-    ...detectReentrancy(ast, source, filePath),
-    ...detectTxOrigin(ast, source, filePath),
-    ...detectUnprotectedUpgrade(ast, source, filePath),
-    ...detectIntegerOverflow(ast, source, filePath),
-    ...detectUncheckedReturn(ast, source, filePath),
-  ];
+  let findings: Finding[] =
+    contractViews && contractViews.length > 0
+      ? [
+          ...contractViews.flatMap((view) => runRulesOnView(view, config)),
+          ...detectIntegerOverflow(ast, source, filePath),
+          ...detectUncheckedReturn(ast, source, filePath),
+        ]
+      : runRulesOnFile(ast, source, filePath);
 
   if (config.plugins) {
     for (const plugin of config.plugins) {
@@ -273,8 +279,20 @@ function computeMetricsForFile(filePath: string): ContractMetrics[] {
  */
 export async function scan(config: ScanConfig): Promise<ScanResult> {
   const files = collectSolFiles(config.targets);
+  const graph = files.length > 0 ? buildImportGraph(files) : undefined;
+  const viewsByFile = new Map<string, MergedContractView[]>();
 
-  const fileResults = await Promise.all(files.map((f) => scanFile(f, config)));
+  if (graph && hasImportDirectives(graph)) {
+    for (const view of buildMergedContractViews(graph)) {
+      const views = viewsByFile.get(view.file) ?? [];
+      views.push(view);
+      viewsByFile.set(view.file, views);
+    }
+  }
+
+  const fileResults = await Promise.all(
+    files.map((f) => scanFile(f, config, graph, viewsByFile.get(path.resolve(f))))
+  );
 
   let allMetrics: ContractMetrics[] = [];
   const complexityFindings: Finding[] = [];
