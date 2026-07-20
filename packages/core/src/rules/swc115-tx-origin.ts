@@ -19,10 +19,6 @@ export function detectTxOrigin(
   options?: RuleOptions,
 ): Finding[] {
   const findings: Finding[] = [];
-  const members =
-    options?.contractView?.members.filter(
-      (m) => m.kind === "function" || m.kind === "modifier",
-    ) ?? [];
 
   if (options?.contractView) {
     for (const member of options.contractView.members) {

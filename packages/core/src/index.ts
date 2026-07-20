@@ -21,6 +21,7 @@
 export { scan } from "./scanner";
 export { clearCache, astCache } from "./ast/cache";
 export type { ASTCacheEntry } from "./ast/cache";
+export { enhanceFindingsWithLLM } from "./llm/enhancer";
 export {
   detectERCStandard,
   checkERC20Compliance,
@@ -31,7 +32,11 @@ export {
   generateMarkdownReport,
   generateJSONReport,
   generateTableReport,
+  generateMarkdownDiffReport,
+  generateJSONDiffReport,
+  generateTableDiffReport,
 } from "./report/generator";
+export { diffScans, computeFingerprint } from "./diff";
 export { isSlitherAvailable } from "./ast/slither";
 export { enhanceFindingsWithLLM } from "./llm/enhancer";
 export { loadPlugin, loadPlugins } from "./plugins";
@@ -47,6 +52,7 @@ export type { ChainProofConfig } from "./config";
 export type {
   ScanConfig,
   ScanResult,
+  ScanDiff,
   FileScanResult,
   Finding,
   GasHint,
