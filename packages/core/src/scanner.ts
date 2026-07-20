@@ -88,7 +88,9 @@ function runRulesOnFile(
 
 async function scanFile(
   filePath: string,
-  config: ScanConfig
+  config: ScanConfig,
+  graph?: ImportGraph,
+  views?: ReturnType<typeof buildMergedContractViews>
 ): Promise<FileScanResult> {
   // Reuse the AST already parsed while building the shared import graph
   // rather than re-reading and re-parsing the file from disk.
@@ -127,13 +129,24 @@ async function scanFile(
     };
   }
 
-  let findings: Finding[] = [
-    ...detectReentrancy(ast, source, filePath),
-    ...detectTxOrigin(ast, source, filePath),
-    ...detectUnprotectedUpgrade(ast, source, filePath),
-    ...detectIntegerOverflow(ast, source, filePath),
-    ...detectUncheckedReturn(ast, source, filePath),
-  ];
+  const fileViews = views ? views.filter((v) => v.file === filePath) : [];
+  let findings: Finding[] = [];
+
+  if (fileViews.length > 0) {
+    for (const view of fileViews) {
+      findings.push(...runRulesOnView(view, config));
+    }
+    findings.push(...detectIntegerOverflow(ast, source, filePath));
+    findings.push(...detectUncheckedReturn(ast, source, filePath));
+  } else {
+    findings = [
+      ...detectReentrancy(ast, source, filePath),
+      ...detectTxOrigin(ast, source, filePath),
+      ...detectUnprotectedUpgrade(ast, source, filePath),
+      ...detectIntegerOverflow(ast, source, filePath),
+      ...detectUncheckedReturn(ast, source, filePath),
+    ];
+  }
 
   if (config.plugins) {
     for (const plugin of config.plugins) {
@@ -273,8 +286,10 @@ function computeMetricsForFile(filePath: string): ContractMetrics[] {
  */
 export async function scan(config: ScanConfig): Promise<ScanResult> {
   const files = collectSolFiles(config.targets);
+  const graph = buildImportGraph(files);
+  const views = buildMergedContractViews(graph);
 
-  const fileResults = await Promise.all(files.map((f) => scanFile(f, config)));
+  const fileResults = await Promise.all(files.map((f) => scanFile(f, config, graph, views)));
 
   let allMetrics: ContractMetrics[] = [];
   const complexityFindings: Finding[] = [];

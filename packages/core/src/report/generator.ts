@@ -1,4 +1,4 @@
-import type { ScanResult, Finding, GasHint, Severity, ContractMetrics } from "../types";
+import type { ScanResult, Finding, GasHint, Severity, ContractMetrics, ScanDiff } from "../types";
 import chalk from "chalk";
 
 const SEVERITY_EMOJI: Record<Severity, string> = {
@@ -326,6 +326,95 @@ export function generateTableReport(result: ScanResult): string {
     });
     file.gasHints.forEach((h) => {
       lines.push(`    ⛽ [gas     ] Line ${String(h.line).padEnd(4)} ${h.description.split(".")[0]}`);
+    });
+    lines.push("");
+  }
+
+  return lines.join("\n");
+}
+
+// ─── Diff Reports ─────────────────────────────────────────────────────────────
+
+function capitalizeSeverity(sev: Severity): string {
+  return sev.charAt(0).toUpperCase() + sev.slice(1);
+}
+
+/**
+ * Generates a Markdown diff report comparing findings between two scans.
+ */
+export function generateMarkdownDiffReport(diff: ScanDiff): string {
+  const lines: string[] = [];
+
+  lines.push("## ChainProof Diff Report");
+  lines.push("");
+
+  lines.push(`### Newly Introduced (${diff.introduced.length})`);
+  if (diff.introduced.length > 0) {
+    lines.push("| Rule   | File                | Line | Severity |");
+    lines.push("|--------|---------------------|------|----------|");
+    sortFindings(diff.introduced).forEach((f) => {
+      lines.push(`| ${f.id} | ${f.file} | ${f.line} | ${capitalizeSeverity(f.severity)} |`);
+    });
+  } else {
+    lines.push("");
+    lines.push("No newly introduced findings.");
+  }
+  lines.push("");
+
+  lines.push(`### Resolved Since Last Scan (${diff.resolved.length})`);
+  if (diff.resolved.length > 0) {
+    lines.push("| Rule   | File                | Line | Severity |");
+    lines.push("|--------|---------------------|------|----------|");
+    sortFindings(diff.resolved).forEach((f) => {
+      lines.push(`| ${f.id} | ${f.file} | ${f.line} | ${capitalizeSeverity(f.severity)} |`);
+    });
+  } else {
+    lines.push("");
+    lines.push("No resolved findings.");
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * Serializes a ScanDiff result to JSON.
+ */
+export function generateJSONDiffReport(diff: ScanDiff): string {
+  return JSON.stringify(diff, null, 2);
+}
+
+/**
+ * Generates an ANSI-formatted terminal table report for a scan diff.
+ */
+export function generateTableDiffReport(diff: ScanDiff): string {
+  const lines: string[] = [];
+
+  lines.push("\n╔═══════════════════════════════════════════════════════════╗");
+  lines.push("║           CHAINPROOF SCAN DIFF REPORT                     ║");
+  lines.push("╚═══════════════════════════════════════════════════════════╝\n");
+
+  lines.push(`  Newly Introduced : ${diff.summary.newCritical} critical, ${diff.summary.newHigh} high (${diff.introduced.length} total)`);
+  lines.push(`  Resolved Total   : ${diff.summary.resolvedTotal}`);
+  lines.push(`  Persisted Total  : ${diff.persisted.length}\n`);
+
+  if (diff.introduced.length > 0) {
+    lines.push("  NEWLY INTRODUCED FINDINGS");
+    lines.push("  ─────────────────────────────────────────");
+    sortFindings(diff.introduced).forEach((f) => {
+      lines.push(
+        `  ${SEVERITY_EMOJI[f.severity]} [${f.severity.padEnd(8)}] ${f.file}:${f.line} — [${f.id}] ${f.title}`
+      );
+    });
+    lines.push("");
+  }
+
+  if (diff.resolved.length > 0) {
+    lines.push("  RESOLVED FINDINGS");
+    lines.push("  ─────────────────────────────────────────");
+    sortFindings(diff.resolved).forEach((f) => {
+      lines.push(
+        `  ✅ [${f.severity.padEnd(8)}] ${f.file}:${f.line} — [${f.id}] ${f.title}`
+      );
     });
     lines.push("");
   }

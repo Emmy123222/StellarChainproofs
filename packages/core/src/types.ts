@@ -284,3 +284,23 @@ export interface ScanConfig {
   slither?: SlitherConfig;
 }
 
+// ─── Scan Diff Result ────────────────────────────────────────────────────────
+
+/**
+ * Result of comparing two {@link ScanResult} objects.
+ */
+export interface ScanDiff {
+  /** Newly introduced findings in the new scan */
+  introduced: Finding[];
+  /** Resolved findings that were in the old scan but not in the new scan */
+  resolved: Finding[];
+  /** Findings present in both scans */
+  persisted: Finding[];
+  /** High-level summary of changes */
+  summary: {
+    newCritical: number;
+    newHigh: number;
+    resolvedTotal: number;
+  };
+}
+
