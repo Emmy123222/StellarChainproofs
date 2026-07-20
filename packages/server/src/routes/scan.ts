@@ -19,6 +19,7 @@ interface ScanRequestBody {
   config?: {
     useLLM?: boolean;
     useSlither?: boolean;
+    useMetrics?: boolean;
     minSeverity?: Severity;
     apiKey?: string;
     llmProvider?: string;
@@ -82,6 +83,7 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
       targets: tmpPaths,
       useSlither: cfg.useSlither ?? false,
       useLLM: cfg.useLLM ?? false,
+      useMetrics: cfg.useMetrics ?? true,
       minSeverity: cfg.minSeverity ?? "low",
       apiKey: cfg.apiKey ?? process.env.ANTHROPIC_API_KEY,
       llmProvider: cfg.llmProvider,
@@ -164,6 +166,7 @@ router.post("/file", async (req: Request, res: Response): Promise<void> => {
       targets: [resolvedPath],
       useSlither: cfg.useSlither ?? false,
       useLLM: cfg.useLLM ?? false,
+      useMetrics: cfg.useMetrics ?? true,
       minSeverity: cfg.minSeverity ?? "low",
       apiKey: cfg.apiKey ?? process.env.ANTHROPIC_API_KEY,
       llmProvider: cfg.llmProvider,

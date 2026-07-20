@@ -135,6 +135,7 @@ program
             targets,
             useSlither,
             useLLM,
+            useMetrics,
             apiKey,
             minSeverity: opts.minSeverity as ScanConfig["minSeverity"],
           },
@@ -236,13 +237,14 @@ program
   .option("--no-metrics", "Skip complexity/maintainability metric computation")
   .option("--api-key <key>", "Anthropic API key")
   .action(
-    async (targets: string[], opts: { slither: boolean; apiKey?: string }) => {
+    async (targets: string[], opts: { slither: boolean; metrics?: boolean; apiKey?: string }) => {
       const spinner = ora("Running security check...").start();
 
       const config: ScanConfig = {
         targets,
         useSlither: opts.slither && isSlitherAvailable(),
         useLLM: false,
+        useMetrics: opts.metrics ?? true,
         minSeverity: "high",
       };
 

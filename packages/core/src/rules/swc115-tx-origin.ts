@@ -40,8 +40,21 @@ export function detectTxOrigin(
           },
         });
       }
-    },
-  });
+    }
+  } else {
+    visit(ast, {
+      MemberAccess(node: ASTNode) {
+        const finding = checkTxOriginNode(
+          node,
+          source,
+          filePath,
+          undefined,
+          options
+        );
+        if (finding) findings.push(finding);
+      },
+    });
+  }
 
   return findings;
 }

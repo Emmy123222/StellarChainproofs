@@ -31,6 +31,13 @@ export function detectIntegerOverflow(
     },
   });
 
+  if (!pragmaVersion) {
+    const pragmaMatch = source.match(/pragma\s+solidity\s+([^;]+);/);
+    if (pragmaMatch) {
+      pragmaVersion = pragmaMatch[1];
+    }
+  }
+
   const is08Plus =
     pragmaVersion.includes("^0.8") ||
     pragmaVersion.includes(">=0.8") ||
