@@ -18,6 +18,13 @@ import {
   detectIntegerOverflow,
   detectUncheckedReturn,
 } from "./rules/swc101-overflow";
+import {
+  detectERCStandard,
+  checkERC20Compliance,
+  checkERC721Compliance,
+  checkERC1155Compliance,
+} from "./rules/erc-compliance";
+import { RuleOptions } from "./rules/rule-context";
 import { detectGasIssues } from "./rules/gas-optimizer";
 import { enhanceFindingsWithLLM } from "./llm/enhancer";
 import { analyzeContract } from "./metrics/complexity";
@@ -28,6 +35,7 @@ import type {
   Finding,
   Severity,
   ContractMetrics,
+  ASTNode,
 } from "./types";
 
 const VERSION = "0.1.0";
@@ -60,6 +68,20 @@ function collectSolFiles(targets: string[]): string[] {
   return [...new Set(files)];
 }
 
+function runERCChecks(
+  ast: ASTNode,
+  source: string,
+  filePath: string,
+  options?: RuleOptions
+): Finding[] {
+  const standard = detectERCStandard(ast);
+  if (!standard) return [];
+  if (standard === "ERC20") return checkERC20Compliance(ast, source, filePath, options);
+  if (standard === "ERC721") return checkERC721Compliance(ast, source, filePath, options);
+  if (standard === "ERC1155") return checkERC1155Compliance(ast, source, filePath, options);
+  return [];
+}
+
 function runRulesOnView(
   view: ReturnType<typeof buildMergedContractViews>[number],
   config: ScanConfig
@@ -86,6 +108,7 @@ function runRulesOnFile(
     ...detectFrontRunningMev(ast, source, filePath),
     ...detectIntegerOverflow(ast, source, filePath),
     ...detectUncheckedReturn(ast, source, filePath),
+    ...runERCChecks(ast, source, filePath),
   ];
 }
 

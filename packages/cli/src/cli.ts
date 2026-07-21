@@ -5,17 +5,23 @@ import chalk from "chalk";
 import ora from "ora";
 import * as fs from "fs";
 import * as path from "path";
+import { execSync } from "child_process";
 import {
   scan,
   generateMarkdownReport,
   generateJSONReport,
   generateTableReport,
+  generateMarkdownDiffReport,
+  generateJSONDiffReport,
+  generateTableDiffReport,
+  diffScans,
+  clearCache,
   isSlitherAvailable,
   loadPlugins,
   loadConfigFile,
   mergePluginsFromConfig,
 } from "@chainproof/core";
-import type { ScanConfig } from "@chainproof/core";
+import type { ScanConfig, ScanResult } from "@chainproof/core";
 import type { ServerOptions } from "@chainproof/server";
 
 // ─── ASCII Banner ─────────────────────────────────────────────────────────────
@@ -65,6 +71,10 @@ program
   )
 
   .option(
+    "--diff <git-ref>",
+    "Compare scan results against specified git reference"
+  )
+  .option(
     "--min-severity <level>",
     "Minimum severity to report: critical|high|medium|low|info",
     "low",
@@ -87,6 +97,7 @@ program
         apiKey?: string;
         llmProvider?: string;
         llmModel?: string;
+        diff?: string;
         minSeverity: string;
         format: string;
         output?: string;
@@ -135,6 +146,7 @@ program
             targets,
             useSlither,
             useLLM,
+            useMetrics,
             apiKey,
             minSeverity: opts.minSeverity as ScanConfig["minSeverity"],
           },
@@ -149,6 +161,7 @@ program
             `  Slither  : ${useSlither ? chalk.green("enabled") : chalk.gray("disabled")}\n` +
             `  LLM      : ${useLLM ? chalk.green("enabled") : chalk.gray("disabled")}\n` +
             `  Plugins  : ${plugins.length > 0 ? chalk.green(`${plugins.length} loaded`) : chalk.gray("none")}\n` +
+            `  Diff     : ${opts.diff ? chalk.cyan(opts.diff) : chalk.gray("none")}\n` +
             `  Severity : ${opts.minSeverity}+\n`,
         ),
       );
@@ -174,6 +187,51 @@ program
         spinner.fail("Scan failed");
         console.error(chalk.red(`\n  Error: ${err}`));
         process.exit(1);
+      }
+
+      // ── Handle diff against git ref if --diff is specified ─────────────────
+      if (opts.diff) {
+        const diffSpinner = ora(`Scanning base git ref (${opts.diff})...`).start();
+        let oldResult: ScanResult;
+        try {
+          oldResult = await scanGitRef(opts.diff, config);
+          diffSpinner.succeed(`Scanned base git ref (${opts.diff})`);
+        } catch (err) {
+          diffSpinner.fail(`Failed to scan git ref (${opts.diff})`);
+          console.error(chalk.red(`\n  Error: ${err}`));
+          process.exit(1);
+        }
+
+        const diff = diffScans(oldResult, result);
+        let diffReport: string;
+        switch (opts.format) {
+          case "json":
+            diffReport = generateJSONDiffReport(diff);
+            break;
+          case "markdown":
+            diffReport = generateMarkdownDiffReport(diff);
+            break;
+          default:
+            diffReport = generateTableDiffReport(diff);
+        }
+
+        if (opts.output) {
+          fs.writeFileSync(opts.output, diffReport, "utf-8");
+          console.log(chalk.green(`\n  ✅ Diff report written to ${opts.output}`));
+        } else {
+          console.log(diffReport);
+        }
+
+        if (diff.summary.newCritical > 0 || diff.summary.newHigh > 0) {
+          console.log(
+            chalk.red(
+              `\n  ❌ ${diff.summary.newCritical} new critical, ${diff.summary.newHigh} new high severity issues introduced.\n`
+            )
+          );
+          process.exit(1);
+        } else {
+          process.exit(0);
+        }
       }
 
       // ── Generate report ────────────────────────────────────────────────────
@@ -227,6 +285,111 @@ program
     },
   );
 
+// ─── scanGitRef helper ────────────────────────────────────────────────────────
+
+async function scanGitRef(gitRef: string, config: ScanConfig): Promise<ScanResult> {
+  const isDirty = execSync("git status --porcelain", { encoding: "utf-8" }).trim().length > 0;
+  let currentRef = "";
+  try {
+    currentRef = execSync("git symbolic-ref --short -q HEAD", { encoding: "utf-8" }).trim();
+    if (!currentRef) {
+      currentRef = execSync("git rev-parse HEAD", { encoding: "utf-8" }).trim();
+    }
+  } catch {
+    currentRef = execSync("git rev-parse HEAD", { encoding: "utf-8" }).trim();
+  }
+
+  let stashed = false;
+  if (isDirty) {
+    execSync("git stash push -m 'chainproof-diff-tmp'", { stdio: "ignore" });
+    stashed = true;
+  }
+
+  try {
+    execSync(`git checkout ${gitRef}`, { stdio: "ignore" });
+    clearCache();
+    return await scan(config);
+  } finally {
+    execSync(`git checkout ${currentRef}`, { stdio: "ignore" });
+    if (stashed) {
+      execSync("git stash pop", { stdio: "ignore" });
+    }
+    clearCache();
+  }
+}
+
+// ─── diff command ─────────────────────────────────────────────────────────────
+
+program
+  .command("diff <oldJson> <newJson>")
+  .description("Compare two JSON scan reports and surface vulnerability regressions")
+  .option("--format <format>", "Output format: table|json|markdown", "table")
+  .option("--output <file>", "Write diff report to file instead of stdout")
+  .option(
+    "--min-severity <level>",
+    "Minimum severity of introduced findings to fail CI: critical|high|medium|low",
+    "high"
+  )
+  .action((oldJsonPath: string, newJsonPath: string, opts: { format: string; output?: string; minSeverity: string }) => {
+    printBanner();
+
+    if (!fs.existsSync(oldJsonPath)) {
+      console.error(chalk.red(`  ❌ File not found: ${oldJsonPath}`));
+      process.exit(1);
+    }
+    if (!fs.existsSync(newJsonPath)) {
+      console.error(chalk.red(`  ❌ File not found: ${newJsonPath}`));
+      process.exit(1);
+    }
+
+    try {
+      const oldResult: ScanResult = JSON.parse(fs.readFileSync(oldJsonPath, "utf-8"));
+      const newResult: ScanResult = JSON.parse(fs.readFileSync(newJsonPath, "utf-8"));
+
+      const diff = diffScans(oldResult, newResult);
+
+      let report: string;
+      switch (opts.format) {
+        case "json":
+          report = generateJSONDiffReport(diff);
+          break;
+        case "markdown":
+          report = generateMarkdownDiffReport(diff);
+          break;
+        default:
+          report = generateTableDiffReport(diff);
+      }
+
+      if (opts.output) {
+        fs.writeFileSync(opts.output, report, "utf-8");
+        console.log(chalk.green(`\n  ✅ Diff report written to ${opts.output}`));
+      } else {
+        console.log(report);
+      }
+
+      const RANK: Record<string, number> = {
+        critical: 5, high: 4, medium: 3, low: 2, info: 1,
+      };
+      const minRank = RANK[opts.minSeverity] ?? 4;
+      const introducedFailures = diff.introduced.filter((f) => (RANK[f.severity] ?? 0) >= minRank);
+
+      if (introducedFailures.length > 0) {
+        console.log(
+          chalk.red(
+            `\n  ❌ ${introducedFailures.length} newly introduced ${opts.minSeverity}+ finding(s) detected.\n`
+          )
+        );
+        process.exit(1);
+      } else {
+        console.log(chalk.green("\n  ✅ No new regressions detected.\n"));
+        process.exit(0);
+      }
+    } catch (err) {
+      console.error(chalk.red(`  ❌ Failed to parse or diff scan reports: ${err}`));
+      process.exit(1);
+    }
+  });
+
 // ─── check command (fast pass/fail for CI) ────────────────────────────────────
 
 program
@@ -236,13 +399,14 @@ program
   .option("--no-metrics", "Skip complexity/maintainability metric computation")
   .option("--api-key <key>", "Anthropic API key")
   .action(
-    async (targets: string[], opts: { slither: boolean; apiKey?: string }) => {
+    async (targets: string[], opts: { slither: boolean; metrics?: boolean; apiKey?: string }) => {
       const spinner = ora("Running security check...").start();
 
       const config: ScanConfig = {
         targets,
         useSlither: opts.slither && isSlitherAvailable(),
         useLLM: false,
+        useMetrics: opts.metrics ?? true,
         minSeverity: "high",
       };
 
