@@ -20,37 +20,31 @@ export function detectTxOrigin(
 ): Finding[] {
   const findings: Finding[] = [];
 
-  if (options?.contractView) {
-    for (const member of options.contractView.members) {
-      if (member.kind === "modifier" || member.kind === "function") {
-        visit(member.node, {
-          MemberAccess(node: ASTNode) {
-            const finding = checkTxOriginNode(
-              node,
-              member.source,
-              filePath,
-              member,
-              options
-            );
-            if (finding) findings.push(finding);
-          },
-        });
-      }
+  if (members.length > 0) {
+    for (const member of members) {
+      visit(member.node, {
+        MemberAccess(node: ASTNode) {
+          const finding = checkTxOriginNode(
+            node,
+            member.source,
+            filePath,
+            member,
+            options
+          );
+          if (finding) findings.push(finding);
+        },
+      });
     }
-  } else {
-    visit(ast, {
-      MemberAccess(node: ASTNode) {
-        const finding = checkTxOriginNode(
-          node,
-          source,
-          filePath,
-          undefined,
-          options
-        );
-        if (finding) findings.push(finding);
-      },
-    });
+
+    return findings;
   }
+
+  visit(ast, {
+    MemberAccess(node: ASTNode) {
+      const finding = checkTxOriginNode(node, source, filePath);
+      if (finding) findings.push(finding);
+    },
+  });
 
   return findings;
 }
