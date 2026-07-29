@@ -226,6 +226,35 @@ chainproof check contracts/
 
 Exits `1` on any critical or high severity finding.
 
+### `chainproof watch`
+
+Long-running watch mode for sub-second local feedback while editing Solidity files. Re-scans only the changed file and its import-graph neighbors (files that import it or are imported by it), reusing the AST cache for everything else.
+
+```bash
+chainproof watch contracts/
+chainproof watch contracts/Vault.sol --debounce 500
+chainproof watch contracts/ --verbose
+chainproof watch contracts/ --once
+```
+
+| Flag                     | Default              | Description                                              |
+| ------------------------ | -------------------- | -------------------------------------------------------- |
+| `--no-slither`           | Slither on           | Skip Slither even if installed                           |
+| `--no-llm`               | LLM on if key set    | Skip Claude enhancement                                  |
+| `--no-metrics`           | Metrics on           | Skip complexity/maintainability metrics                  |
+| `--api-key <key>`        | `$ANTHROPIC_API_KEY` | Anthropic API key                                        |
+| `--min-severity <level>` | `low`                | Filter findings below this level                         |
+| `--plugin <plugin>`      | from config          | Load a custom plugin (repeatable)                        |
+| `--debounce <ms>`        | `300`                | Debounce window for save events before re-scanning       |
+| `--verbose`              | off                  | Append scrollback output instead of live in-place UI     |
+| `--once`                 | off                  | Single scan then exit (same output/exit codes as `scan`) |
+
+**Behavior:** When stdout is a TTY, watch refreshes an in-place summary (severity counts and recent findings). When piped or in CI, output is plain sequential text. Press Ctrl+C to exit cleanly.
+
+**Exit codes:** Same as `scan` — `0` if no critical/high findings; `1` if critical or high issues are detected. With `--once`, behavior matches `chainproof scan` exactly.
+
+Respects `.chainproofrc.json` for plugins the same way `scan` does.
+
 ### `chainproof init`
 
 Creates a `.chainproofrc.json` config file in the current directory.

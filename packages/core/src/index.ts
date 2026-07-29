@@ -18,9 +18,10 @@
 
 // ─── Public stable exports ────────────────────────────────────────────────────
 
-export { scan } from "./scanner";
-export { clearCache, astCache } from "./ast/cache";
-export type { ASTCacheEntry } from "./ast/cache";
+export { scan, createWatchScanState, scanIncremental, collectSolFiles } from "./scanner";
+export type { WatchScanState, IncrementalScanOutcome } from "./scanner";
+export { clearCache, astCache, resetCacheStats, getCacheStats } from "./ast/cache";
+export type { ASTCacheEntry, ASTCacheStats } from "./ast/cache";
 export { enhanceFindingsWithLLM } from "./llm/enhancer";
 export {
   detectERCStandard,
@@ -65,6 +66,14 @@ export type {
   SlitherConfig,
   SlitherDetectorConfig,
 } from "./types";
+
+export {
+  buildImportGraph,
+  buildMergedContractViews,
+  computeRescanSet,
+  resolveImportPath,
+  hasImportDirectives,
+} from "./ast/import-graph";
 
 export type {
   ImportGraph,

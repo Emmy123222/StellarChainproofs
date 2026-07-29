@@ -20,6 +20,7 @@ describe("ASTCache", () => {
   test("returns undefined on cache miss", () => {
     const cache = new ASTCache();
     expect(cache.get("nonexistent")).toBeUndefined();
+    expect(cache.getStats().misses).toBe(1);
   });
 
   test("returns entry on cache hit", () => {

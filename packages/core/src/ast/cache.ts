@@ -12,10 +12,17 @@ export interface ASTCacheEntry {
  * LRU cache for parsed Solidity ASTs, keyed by SHA-256 of file content.
  * Unchanged files return their cached AST instantly, skipping the parser.
  */
+export interface ASTCacheStats {
+  hits: number;
+  misses: number;
+}
+
 export class ASTCache {
   private readonly maxSize: number;
   // Map insertion order = LRU order; oldest key is first.
   private readonly cache = new Map<string, ASTCacheEntry>();
+  private hits = 0;
+  private misses = 0;
 
   constructor(maxSize = 200) {
     this.maxSize = maxSize;
@@ -27,11 +34,24 @@ export class ASTCache {
 
   get(hash: string): ASTCacheEntry | undefined {
     const entry = this.cache.get(hash);
-    if (!entry) return undefined;
+    if (!entry) {
+      this.misses++;
+      return undefined;
+    }
+    this.hits++;
     // Bump to most-recently-used position.
     this.cache.delete(hash);
     this.cache.set(hash, entry);
     return entry;
+  }
+
+  resetStats(): void {
+    this.hits = 0;
+    this.misses = 0;
+  }
+
+  getStats(): ASTCacheStats {
+    return { hits: this.hits, misses: this.misses };
   }
 
   set(hash: string, entry: ASTCacheEntry): void {
@@ -72,4 +92,14 @@ export const astCache = new ASTCache();
 /** Remove all cached ASTs. Useful after a full workspace clean. */
 export function clearCache(): void {
   astCache.clear();
+}
+
+/** Reset hit/miss counters on the shared AST cache singleton. */
+export function resetCacheStats(): void {
+  astCache.resetStats();
+}
+
+/** Read current hit/miss counters from the shared AST cache singleton. */
+export function getCacheStats(): ASTCacheStats {
+  return astCache.getStats();
 }

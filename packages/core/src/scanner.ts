@@ -4,10 +4,12 @@ import { parseSolidity } from "./ast/parser";
 import {
   buildImportGraph,
   buildMergedContractViews,
+  computeRescanSet,
   hasImportDirectives,
   type ImportGraph,
   type MergedContractView,
 } from "./ast/import-graph";
+import { getCacheStats, resetCacheStats } from "./ast/cache";
 import { runSlither, isSlitherAvailable, mergeSlitherFindings } from "./ast/slither";
 import { detectReentrancy } from "./rules/swc107-reentrancy";
 import { detectCrossFunctionReentrancy } from "./rules/swc107-reentrancy-v2";
@@ -377,3 +379,153 @@ export async function scan(config: ScanConfig): Promise<ScanResult> {
     metrics: allMetrics.length > 0 ? allMetrics : undefined,
   };
 }
+
+export interface WatchScanState {
+  allFiles: string[];
+  result: ScanResult;
+}
+
+export interface IncrementalScanOutcome {
+  state: WatchScanState;
+  rescannedFiles: string[];
+  cacheStats: ReturnType<typeof getCacheStats>;
+}
+
+function buildViewsByFile(graph: ImportGraph): Map<string, MergedContractView[]> {
+  const viewsByFile = new Map<string, MergedContractView[]>();
+  if (!hasImportDirectives(graph)) {
+    return viewsByFile;
+  }
+
+  for (const view of buildMergedContractViews(graph)) {
+    const views = viewsByFile.get(view.file) ?? [];
+    views.push(view);
+    viewsByFile.set(view.file, views);
+  }
+
+  return viewsByFile;
+}
+
+function computeSummary(fileResults: FileScanResult[]): ScanResult["summary"] {
+  const summary = {
+    critical: 0,
+    high: 0,
+    medium: 0,
+    low: 0,
+    info: 0,
+    gas: 0,
+    total: 0,
+  };
+
+  for (const r of fileResults) {
+    for (const f of r.findings) {
+      summary[f.severity]++;
+      summary.total++;
+    }
+    summary.gas += r.gasHints.length;
+    summary.total += r.gasHints.length;
+  }
+
+  return summary;
+}
+
+/**
+ * Run an initial full scan and retain state for incremental watch re-scans.
+ */
+export async function createWatchScanState(config: ScanConfig): Promise<WatchScanState> {
+  const result = await scan(config);
+  return {
+    allFiles: collectSolFiles(config.targets),
+    result,
+  };
+}
+
+/**
+ * Re-scan only files affected by a change (changed file + import graph neighbors),
+ * merging results into the previous watch state. Unchanged files reuse cached ASTs.
+ */
+export async function scanIncremental(
+  config: ScanConfig,
+  state: WatchScanState,
+  changedFiles: string[]
+): Promise<IncrementalScanOutcome> {
+  resetCacheStats();
+
+  const graph = buildImportGraph(state.allFiles);
+  const rescanSet = computeRescanSet(changedFiles, graph);
+  const viewsByFile = buildViewsByFile(graph);
+
+  const rescannedFiles = [...rescanSet].filter((f) =>
+    state.allFiles.some((known) => path.resolve(known) === f)
+  );
+
+  const newFileResults = await Promise.all(
+    rescannedFiles.map((f) =>
+      scanFile(f, config, graph, viewsByFile.get(path.resolve(f)))
+    )
+  );
+
+  const fileMap = new Map(
+    state.result.files.map((f) => [path.resolve(f.file), f])
+  );
+  for (const fileResult of newFileResults) {
+    fileMap.set(path.resolve(fileResult.file), fileResult);
+  }
+
+  const mergedFiles = state.allFiles.map(
+    (f) => fileMap.get(path.resolve(f))!
+  );
+
+  let allMetrics = state.result.metrics ? [...state.result.metrics] : [];
+  const complexityFindings: Finding[] = [];
+
+  if (config.useMetrics) {
+    const rescannedAbs = new Set(rescannedFiles.map((f) => path.resolve(f)));
+    allMetrics = allMetrics.filter((m) => !rescannedAbs.has(path.resolve(m.file)));
+
+    for (const filePath of rescannedFiles) {
+      const metrics = computeMetricsForFile(filePath);
+      allMetrics.push(...metrics);
+
+      if (metrics.length > 0) {
+        try {
+          const source = fs.readFileSync(filePath, "utf-8");
+          complexityFindings.push(
+            ...generateComplexityFindings(metrics, source, filePath)
+          );
+        } catch {
+          // Skip unreadable files
+        }
+      }
+    }
+  }
+
+  if (complexityFindings.length > 0) {
+    for (const filePath of rescannedFiles) {
+      const target = fileMap.get(path.resolve(filePath));
+      if (target && !target.parseError) {
+        target.findings = target.findings.filter((f) => f.id !== "CP-METRICS-CC");
+        const fileComplexity = complexityFindings.filter(
+          (f) => path.resolve(f.file) === path.resolve(filePath)
+        );
+        target.findings.push(...fileComplexity);
+      }
+    }
+  }
+
+  const result: ScanResult = {
+    version: VERSION,
+    timestamp: new Date().toISOString(),
+    files: mergedFiles,
+    summary: computeSummary(mergedFiles),
+    metrics: allMetrics.length > 0 ? allMetrics : undefined,
+  };
+
+  return {
+    state: { allFiles: state.allFiles, result },
+    rescannedFiles,
+    cacheStats: getCacheStats(),
+  };
+}
+
+export { collectSolFiles };

@@ -23,6 +23,7 @@ import {
 } from "@chainproof/core";
 import type { ScanConfig, ScanResult } from "@chainproof/core";
 import type { ServerOptions } from "@chainproof/server";
+import { registerWatchCommand } from "./commands/watch";
 
 // ─── ASCII Banner ─────────────────────────────────────────────────────────────
 
@@ -545,5 +546,7 @@ program
       }
     }
   );
+
+registerWatchCommand(program, printBanner);
 
 program.parse();
