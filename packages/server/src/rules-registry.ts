@@ -59,6 +59,16 @@ export const RULES: RuleMeta[] = [
       "Always check the return value or use transfer().",
   },
   {
+    id: "CP-122",
+    title: "Vault share-price inflation",
+    severity: "high",
+    category: "security",
+    description:
+      "Detects ERC-4626-style vaults that combine naive share-ratio math with live " +
+      "token-balance accounting and no virtual offset, dead shares, or minimum-liquidity " +
+      "initialization, exposing later depositors to first-depositor donation attacks.",
+  },
+  {
     id: "GAS-LOOP-STORAGE",
     title: "Storage read inside loop",
     severity: "gas",

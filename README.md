@@ -361,6 +361,7 @@ See [`.github/workflows/audit.yml`](.github/workflows/audit.yml) for a complete 
 | CP-115 | [SWC-115](https://swcregistry.io/docs/SWC-115) | `tx.origin` authentication   | High     | `tx.origin` used in `require` or access control    |
 | CP-101 | [SWC-101](https://swcregistry.io/docs/SWC-101) | Integer overflow / underflow | High     | Arithmetic on pragma `< 0.8` without SafeMath      |
 | CP-104 | [SWC-104](https://swcregistry.io/docs/SWC-104) | Unchecked call return value  | Medium   | `.call` / `.send` return value not checked         |
+| CP-122 | —                                              | Vault share-price inflation  | High     | Live-balance share ratio without initialization protection |
 | GAS-\* | —                                              | Gas optimizations            | Gas      | Storage in loops, packing, `keccak256`, etc.       |
 
 When Slither is installed, all [Slither detectors](https://github.com/crytic/slither/wiki/Detector-Documentation) are merged in with deduplication by line + title. Slither findings are prefixed with `SLITHER-`.

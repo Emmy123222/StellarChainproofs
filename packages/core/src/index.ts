@@ -28,6 +28,7 @@ export {
   checkERC721Compliance,
   checkERC1155Compliance,
 } from "./rules/erc-compliance";
+export { detectVaultInflation } from "./rules/cp122-vault-inflation";
 export {
   generateMarkdownReport,
   generateJSONReport,
@@ -38,7 +39,6 @@ export {
 } from "./report/generator";
 export { diffScans, computeFingerprint } from "./diff";
 export { isSlitherAvailable } from "./ast/slither";
-export { enhanceFindingsWithLLM } from "./llm/enhancer";
 export { loadPlugin, loadPlugins } from "./plugins";
 export {
   loadConfigFile,

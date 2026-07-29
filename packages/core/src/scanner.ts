@@ -23,6 +23,7 @@ import {
   checkERC721Compliance,
   checkERC1155Compliance,
 } from "./rules/erc-compliance";
+import { detectVaultInflation } from "./rules/cp122-vault-inflation";
 import { RuleOptions } from "./rules/rule-context";
 import { detectGasIssues } from "./rules/gas-optimizer";
 import { enhanceFindingsWithLLM } from "./llm/enhancer";
@@ -94,6 +95,7 @@ function runRulesOnView(
     ...detectIntegerOverflow(view.node, view.source, view.file),
     ...detectUncheckedReturn(view.node, view.source, view.file),
     ...runERCChecks(view.node, view.source, view.file, ruleOptions),
+    ...detectVaultInflation(view.node, view.source, view.file, ruleOptions),
   ];
 }
 
@@ -109,6 +111,7 @@ function runRulesOnFile(
     ...detectIntegerOverflow(ast, source, filePath),
     ...detectUncheckedReturn(ast, source, filePath),
     ...runERCChecks(ast, source, filePath),
+    ...detectVaultInflation(ast, source, filePath),
   ];
 }
 
