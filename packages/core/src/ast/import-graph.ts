@@ -427,6 +427,39 @@ export function buildMergedContractViews(graph: ImportGraph): MergedContractView
 }
 
 /**
+ * Compute the minimal set of files to re-scan when one or more files change.
+ * Includes each changed file, files that import it (dependents), and files it imports.
+ */
+export function computeRescanSet(
+  changedFiles: string[],
+  graph: ImportGraph
+): Set<string> {
+  const rescan = new Set<string>();
+
+  for (const changed of changedFiles) {
+    const abs = path.resolve(changed);
+    if (!graph.files.has(abs)) {
+      rescan.add(abs);
+      continue;
+    }
+
+    rescan.add(abs);
+
+    for (const imported of graph.edges.get(abs) ?? []) {
+      rescan.add(imported);
+    }
+
+    for (const [file, imports] of graph.edges) {
+      if (imports.includes(abs)) {
+        rescan.add(file);
+      }
+    }
+  }
+
+  return rescan;
+}
+
+/**
  * Returns true if any parsed file contains import directives.
  */
 export function hasImportDirectives(graph: ImportGraph): boolean {

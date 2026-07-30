@@ -19,6 +19,7 @@ export function detectTxOrigin(
   options?: RuleOptions,
 ): Finding[] {
   const findings: Finding[] = [];
+  const members = options?.contractView?.members ?? [];
 
   if (members.length > 0) {
     for (const member of members) {
