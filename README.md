@@ -263,6 +263,23 @@ Creates a `.chainproofrc.json` config file in the current directory.
 chainproof init
 ```
 
+### `chainproof threat-model`
+
+Automatically generates a comprehensive threat model for the target smart contracts, detailing identified assets, actors, trust boundaries, public entry points, and prioritized security threats (with STRIDE and DeFi classifications).
+
+```bash
+chainproof threat-model contracts/
+chainproof threat-model contracts/Vault.sol --format json --output threat-model.json
+chainproof threat-model contracts/ --assumptions assumptions.json --min-severity high
+```
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--assumptions <file>` | none | JSON file containing user-provided overrides/mitigations |
+| `--min-severity <level>` | `low` | Filter prioritized threats below this level (critical\|high\|medium\|low) |
+| `--format <format>` | `markdown` | Output format: `markdown` or `json` |
+| `--output <file>` | stdout | Write threat model report to file |
+
 ---
 
 ## VS Code Extension
