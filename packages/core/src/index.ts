@@ -82,3 +82,36 @@ export type {
   MergedMember,
   MergedContractView,
 } from "./ast/import-graph";
+
+// ─── Threat Modeling ─────────────────────────────────────────────────────────
+export { generateThreatModel } from "./threat-model";
+export {
+  generateMarkdownThreatModel,
+  generateJSONThreatModel,
+  generateMermaidDiagram,
+  generateASCIIDiagram,
+  extractThreatModel,
+  prioritizeThreats,
+  loadAssumptions,
+  mergeAssumptions,
+  DEFAULT_AGENTS,
+} from "./threat-model";
+export type {
+  ThreatModel,
+  ThreatModelConfig,
+  ThreatModelAssumptions,
+  ThreatModelSummary,
+  Asset,
+  ThreatAgent,
+  TrustBoundary,
+  EntryPoint,
+  AttackSurface,
+  Threat,
+  STRIDECategory,
+  DeFiCategory,
+  LocationInfo,
+  SeverityLevel as TMSeverityLevel,
+  AssetValue,
+  AssetType,
+} from "./threat-model";
+

@@ -20,6 +20,9 @@ import {
   loadPlugins,
   loadConfigFile,
   mergePluginsFromConfig,
+  generateThreatModel,
+  generateMarkdownThreatModel,
+  generateJSONThreatModel,
 } from "@chainproof/core";
 import type { ScanConfig, ScanResult } from "@chainproof/core";
 import type { ServerOptions } from "@chainproof/server";
@@ -542,6 +545,80 @@ program
         await startServer(serverOpts);
       } catch (err) {
         console.error(chalk.red(`\n  ❌ Failed to start server: ${err}`));
+        process.exit(1);
+      }
+    }
+  );
+
+// ─── threat-model command ───────────────────────────────────────────────────
+
+program
+  .command("threat-model <targets...>")
+  .description("Generate a comprehensive threat model for the target smart contracts")
+  .option(
+    "--assumptions <file>",
+    "Path to a JSON file containing user-provided assumptions/overrides"
+  )
+  .option(
+    "--min-severity <level>",
+    "Minimum severity of threats to prioritize: critical|high|medium|low",
+    "low"
+  )
+  .option(
+    "--format <format>",
+    "Output format: markdown|json",
+    "markdown"
+  )
+  .option(
+    "--output <file>",
+    "Write threat model report to file instead of stdout"
+  )
+  .action(
+    async (
+      targets: string[],
+      opts: {
+        assumptions?: string;
+        minSeverity: string;
+        format: "markdown" | "json";
+        output?: string;
+      }
+    ) => {
+      const isJson = opts.format === "json";
+      if (!isJson) {
+        printBanner();
+      }
+
+      const spinner = isJson ? null : ora("Generating threat model...").start();
+
+      try {
+        const model = await generateThreatModel({
+          targets,
+          assumptionsPath: opts.assumptions,
+          minSeverity: opts.minSeverity as any,
+        });
+
+        if (spinner) {
+          spinner.succeed(`Threat model generated successfully with ${model.threats.length} threat(s)`);
+        }
+
+        let reportStr: string;
+        if (isJson) {
+          reportStr = generateJSONThreatModel(model);
+        } else {
+          reportStr = generateMarkdownThreatModel(model);
+        }
+
+        if (opts.output) {
+          fs.writeFileSync(opts.output, reportStr, "utf-8");
+          console.log(chalk.green(`\n  ✅ Threat model written to ${opts.output}`));
+        } else {
+          console.log(reportStr);
+        }
+      } catch (err) {
+        if (spinner) {
+          spinner.fail("Threat model generation failed");
+        }
+        console.error(chalk.red(`\n  Error: ${err}`));
         process.exit(1);
       }
     }
