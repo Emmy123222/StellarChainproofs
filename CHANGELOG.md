@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Deterministic Security Invariant Specification and Checking DSL**
+  (`packages/core/src/dsl/`, `chainproof invariants`): a versioned,
+  declarative JSON DSL for expressing protocol-specific security invariants
+  — `access`, `state`, `arithmetic`, `call-order`, `event`, `value-flow`,
+  and `cross-function` — with a small deterministic condition-expression
+  language, JSON-schema + type validation, source binding against the same
+  inheritance/import-resolved contract views the rest of ChainProof uses
+  (overload disambiguation via `scope.signature`), reusable predicates with
+  cycle detection, and bounded AST/call-graph evaluation (per-invariant
+  step budget, total wall-clock budget, deterministic result ordering by
+  invariant id). Evidence and counterexamples carry exact source ranges.
+  New public API: `parseInvariantSpecFile`, `validateInvariantSpecFile`,
+  `checkInvariants`, `checkInvariantsFromFile`, `explainInvariant`,
+  `migrateInvariantSpecFile`, `scaffoldInvariantSpec`, `serializeReport`.
+  New CLI: `chainproof invariants init|validate|check|explain|migrate`.
+  See [docs/invariant-dsl.md](docs/invariant-dsl.md).
+
 - Public API surface audit for `@chainproof/core`: every export is now categorized
   as public/stable or `@internal`, and the internal-only helpers (`parseSolidity`,
   `visit`, `runSlither`) are explicitly tagged as such.
