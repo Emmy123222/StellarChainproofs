@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Production staking, reward-distribution, and vesting accounting analysis with
+  a bounded state-transition model, 13 evidence-driven rules, explicit
+  Synthetix/MasterChef/VestingWallet adapters, versioned deterministic JSON and
+  Markdown reports, configuration migration/validation, cancellation, scanner
+  integration, and the `chainproof staking` CLI. Includes vulnerable/secure
+  fixtures for checkpoint ordering, zero-supply periods, precision, funding,
+  fee-on-transfer and rebasing assets, multiple rewards, emergency exits,
+  recovery, and vesting boundaries. See
+  [the staking accounting guide](docs/staking-accounting.md).
 - Token callback/hook/reentrancy analysis (`@chainproof/core`
   `packages/core/src/rules/callback-analysis/`): models the implicit
   control-flow edges ERC-721/1155 receiver hooks, ERC-777 sender/receiver
