@@ -42,6 +42,26 @@ export interface Finding {
   importPath?: string[];
   /** Call path showing the vulnerable execution trace (e.g., ["withdraw", "_updateBalance"]) */
   callPath?: string[];
+  /**
+   * Supporting evidence for why the analysis reached this conclusion
+   * (e.g. which interface signature or ERC-165 selector was matched).
+   * Populated by evidence-driven detectors such as the callback/hook
+   * reentrancy analysis; absent for simpler pattern-based rules.
+   */
+  evidence?: FindingEvidenceItem[];
+  /** Explicit assumptions the finding relies on (e.g. "recipient is untrusted"), so a reviewer can judge applicability. */
+  assumptions?: string[];
+  /** How confident the analysis is in this specific finding, when the detector distinguishes confidence levels. */
+  confidence?: "high" | "medium" | "low";
+}
+
+/**
+ * A single piece of supporting evidence attached to a {@link Finding}.
+ */
+export interface FindingEvidenceItem {
+  description: string;
+  file?: string;
+  line?: number;
 }
 
 // ─── Gas optimization hint ────────────────────────────────────────────────────

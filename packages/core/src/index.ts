@@ -31,6 +31,22 @@ export {
 } from "./rules/erc-compliance";
 export { detectVaultInflation } from "./rules/cp122-vault-inflation";
 export {
+  detectCallbackReentrancy,
+  buildCallbackGraph,
+  detectImplementedReceiverHooks,
+  detectERC165Support,
+  detectCallbackSpoofing,
+  RECEIVER_HOOK_SIGNATURES,
+} from "./rules/callback-analysis";
+export type {
+  CallbackStandard,
+  CallbackKind,
+  CallbackEdge,
+  CallbackGraph,
+  InterfaceEvidence,
+  GuardEvidence,
+} from "./rules/callback-analysis";
+export {
   generateMarkdownReport,
   generateJSONReport,
   generateTableReport,
@@ -56,6 +72,7 @@ export type {
   ScanDiff,
   FileScanResult,
   Finding,
+  FindingEvidenceItem,
   GasHint,
   Severity,
   ChainProofPlugin,

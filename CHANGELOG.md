@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Token callback/hook/reentrancy analysis (`@chainproof/core`
+  `packages/core/src/rules/callback-analysis/`): models the implicit
+  control-flow edges ERC-721/1155 receiver hooks, ERC-777 sender/receiver
+  hooks, ERC-3156-style flash-loan callbacks, legacy ERC-223
+  `tokenFallback`, and project-defined callback registries introduce, and
+  detects incomplete state before the callback (`CP-CB-CEI`), cross-function
+  reentrancy through it (`CP-CB-CROSSFN`), read-only reentrancy exposed via a
+  `view` function (`CP-CB-READONLY`), unauthenticated callback spoofing
+  (`CP-CB-SPOOF`), and unbounded batch callbacks (`CP-CB-BATCH`). Recognizes
+  reentrancy-guard modifiers, hand-rolled mutexes, trusted-receiver
+  allowlists, EOA-only checks, and flash-callback repayment invariants as
+  suppressing guards. Findings carry `evidence`, `assumptions`, and
+  `confidence`. See the [README](README.md#callback-hook--reentrancy-analysis-cp-90)
+  for the full threat model and known limitations.
 - Public API surface audit for `@chainproof/core`: every export is now categorized
   as public/stable or `@internal`, and the internal-only helpers (`parseSolidity`,
   `visit`, `runSlither`) are explicitly tagged as such.

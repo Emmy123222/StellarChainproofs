@@ -114,6 +114,47 @@ describe("generateMarkdownReport", () => {
     expect(md).toContain("critical or high severity");
   });
 
+  it("renders call path, confidence, evidence, and assumptions when present", () => {
+    const withEvidence: ScanResult = {
+      ...CLEAN_RESULT,
+      files: [
+        {
+          file: "vault.sol",
+          findings: [
+            {
+              id: "CP-CB-CEI",
+              title: "Incomplete state update before ERC-721 callback",
+              description: "d",
+              recommendation: "r",
+              severity: "critical",
+              file: "vault.sol",
+              line: 5,
+              callPath: ["safeMint", "_checkOnERC721Received"],
+              confidence: "high",
+              evidence: [{ description: "Direct call to onERC721Received(...)", line: 12 }],
+              assumptions: ["Assumed satisfied: recipient is untrusted"],
+            },
+          ],
+          gasHints: [],
+          slitherRan: false,
+        },
+      ],
+      summary: { critical: 1, high: 0, medium: 0, low: 0, info: 0, gas: 0, total: 1 },
+    };
+    const md = generateMarkdownReport(withEvidence);
+    expect(md).toContain("safeMint → _checkOnERC721Received");
+    expect(md).toContain("**Confidence:** high");
+    expect(md).toContain("Direct call to onERC721Received(...)");
+    expect(md).toContain("Assumed satisfied: recipient is untrusted");
+  });
+
+  it("does not render evidence/assumptions/call-path sections when absent", () => {
+    const md = generateMarkdownReport(MOCK_RESULT);
+    expect(md).not.toContain("**Evidence**");
+    expect(md).not.toContain("**Assumptions**");
+    expect(md).not.toContain("**Call path:**");
+  });
+
   it("does not warn when there are no critical/high findings", () => {
     const safe: ScanResult = {
       ...CLEAN_RESULT,

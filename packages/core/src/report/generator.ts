@@ -179,6 +179,10 @@ export function generateMarkdownReport(result: ScanResult): string {
         lines.push("");
         lines.push(`- **ID:** \`${f.id}\`${f.swcId ? ` ([${f.swcId}](https://swcregistry.io/docs/${f.swcId}))` : ""}`);
         lines.push(`- **Location:** Line ${f.line}`);
+        if (f.confidence) lines.push(`- **Confidence:** ${f.confidence}`);
+        if (f.callPath && f.callPath.length > 0) {
+          lines.push(`- **Call path:** ${f.callPath.join(" → ")}`);
+        }
         if (f.llmEnhanced) lines.push("- **Enhanced by:** AI analysis ✨");
         lines.push("");
         lines.push("**Description**");
@@ -196,6 +200,24 @@ export function generateMarkdownReport(result: ScanResult): string {
           lines.push("```solidity");
           lines.push(f.snippet);
           lines.push("```");
+          lines.push("");
+        }
+
+        if (f.evidence && f.evidence.length > 0) {
+          lines.push("**Evidence**");
+          lines.push("");
+          for (const e of f.evidence) {
+            lines.push(`- ${e.description}${e.line ? ` (line ${e.line})` : ""}`);
+          }
+          lines.push("");
+        }
+
+        if (f.assumptions && f.assumptions.length > 0) {
+          lines.push("**Assumptions**");
+          lines.push("");
+          for (const a of f.assumptions) {
+            lines.push(`- ${a}`);
+          }
           lines.push("");
         }
 

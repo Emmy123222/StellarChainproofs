@@ -408,9 +408,16 @@ See [`.github/workflows/audit.yml`](.github/workflows/audit.yml) for a complete 
 | CP-101 | [SWC-101](https://swcregistry.io/docs/SWC-101) | Integer overflow / underflow | High     | Arithmetic on pragma `< 0.8` without SafeMath      |
 | CP-104 | [SWC-104](https://swcregistry.io/docs/SWC-104) | Unchecked call return value  | Medium   | `.call` / `.send` return value not checked         |
 | CP-122 | —                                              | Vault share-price inflation  | High     | Live-balance share ratio without initialization protection |
+| CP-CB-CEI | —                                           | Incomplete state before a standards-driven callback | Critical | ERC-721/1155/777/3156 hook fired with state left unfinalized |
+| CP-CB-CROSSFN | —                                       | Cross-function reentrancy via callback | Critical | Sibling function touches state left stale across the callback |
+| CP-CB-READONLY | —                                      | Read-only reentrancy via callback | High     | `view` function exposes a value finalized only after the callback |
+| CP-CB-SPOOF | —                                         | Callback spoofing | High     | Receiver-hook function mutates state with no `msg.sender` check |
+| CP-CB-BATCH | —                                         | Unbounded batch callback | Medium   | Callback fired once per loop iteration with no length cap |
 | GAS-\* | —                                              | Gas optimizations            | Gas      | Storage in loops, packing, `keccak256`, etc.       |
 
 When Slither is installed, all [Slither detectors](https://github.com/crytic/slither/wiki/Detector-Documentation) are merged in with deduplication by line + title. Slither findings are prefixed with `SLITHER-`.
+
+See [Callback, Hook & Reentrancy Analysis](#callback-hook--reentrancy-analysis-cp-90) below for what `CP-CB-*` covers, how it recognizes guards, and its known limitations.
 
 ### Rule detection flow
 
@@ -421,10 +428,12 @@ flowchart TB
     ast --> r3[Overflow]
     ast --> r4[Unchecked Return]
     ast --> r5[Gas rules]
+    ast --> r6[Callback/Hook Reentrancy]
     r1 --> merge[Security findings]
     r2 --> merge
     r3 --> merge
     r4 --> merge
+    r6 --> merge
     slither[Slither] --> merge
     r5 --> gas[Gas hints]
 ```
@@ -438,6 +447,82 @@ flowchart TB
 node packages/cli/dist/cli.js scan examples/contracts/VulnerableVault.sol
 node packages/cli/dist/cli.js scan examples/contracts/SecureVault.sol
 ```
+
+### Callback, Hook & Reentrancy Analysis (CP-90)
+
+`packages/core/src/rules/callback-analysis/` models the **implicit control-flow
+edges** that ERC-721/ERC-1155/ERC-777 receiver and sender hooks, ERC-3156-style
+flash-loan callbacks, and project-defined callback registries introduce — call
+paths that plain external-call detection (`CP-107` / `CP-107-X`) doesn't see
+because there is no literal `.call{value: ...}("")` in the vulnerable function.
+
+**Threat model.** Any address a contract mints/transfers/lends to under one of
+these standards is assumed untrusted until proven otherwise (an allowlisted
+receiver, an EOA-only check, or a reentrancy guard). The analysis asks: at the
+moment control is handed to that address, is any contract state left
+unfinalized, and can that address (or a sibling function it can trigger) turn
+that window into a real primitive?
+
+**What's modeled** (`callback-graph.ts`, `standards.ts`): direct hook
+invocations (`onERC721Received`, `onERC1155Received`/`BatchReceived`,
+ERC-777 `tokensReceived`/`tokensToSend`, `onFlashLoan`, `tokenFallback`),
+OpenZeppelin-style dispatch helpers (`_checkOnERC721Received`,
+`_callTokensToSend`, …) reached indirectly through the function call graph
+(up to 3 hops), low-level calls carrying a hook's selector, and custom
+callback-registry lookups (`IHook(handlers[token]).onX(...)`). Each edge
+records whether it fires once (`isBatch: false`) or once per loop iteration
+over a caller-supplied array (`isBatch: true`, plus `isUnboundedBatch` when no
+explicit length cap precedes the loop).
+
+**What's detected**, one rule ID per class so findings can be triaged/suppressed independently:
+
+- **`CP-CB-CEI`** — state variables the entry function still writes to at or
+  after the callback (same-function Checks-Effects-Interactions violation);
+  for flash-callback edges specifically, this fires when no post-callback
+  repayment/invariant check is found.
+- **`CP-CB-CROSSFN`** — a sibling function reads/writes state the entry
+  function read before the callback without having finalized it first.
+- **`CP-CB-READONLY`** — a `view` function exposes a value the entry function
+  only finalizes *after* the callback — the read-only reentrancy pattern used
+  to manipulate on-chain price/exchange-rate consumers.
+- **`CP-CB-SPOOF`** — a receiver-hook-shaped function mutates sensitive state
+  without checking `msg.sender`, so anyone can call it directly and spoof a
+  transfer that never happened.
+- **`CP-CB-BATCH`** — a batch callback loop with no explicit
+  `require(arr.length <= MAX)` guard (reentrancy surface multiplication +
+  gas-griefing DoS).
+
+**Guards recognized** (`guards.ts`), any of which suppresses the
+corresponding finding and is instead recorded as an `assumption` on findings
+it doesn't fully suppress: a `nonReentrant`-style modifier, a hand-rolled
+`require(!locked)` / `locked = true` / `locked = false` mutex, a
+trust/allowlist check on the callback target, an EOA-only
+(`code.length == 0` / `isContract()`) check, and — for flash-callbacks only —
+a post-callback balance-plus-fee invariant check.
+
+**Confidence & evidence.** Every finding carries `confidence` (`high` /
+`medium` / `low`) and an `evidence` array citing exactly which signal (a
+matched function signature, a low-level selector, a helper-name heuristic,
+…) the conclusion rests on, plus `assumptions` for any guard that was
+evaluated but didn't fully suppress the finding. `callPath` shows the
+concrete call chain from the entry function to the callback (and to the
+affected sibling, for `CP-CB-CROSSFN`/`CP-CB-READONLY`).
+
+**Determinism & bounds.** Traversal is a bounded, cycle-safe AST walk (see
+`ast-walk.ts`); hitting the traversal budget on a pathological/adversarial
+contract surfaces a `CP-CB-TRUNCATED` info-level finding rather than hanging
+or silently under-reporting. Given the same input, output is always
+byte-identical (findings are sorted by file, line, then rule ID).
+
+**Limitations.** Requires a `MergedContractView` (i.e. runs wherever
+`CP-107-X` runs — see [Data Model](#data-model)); CEI/cross-function analysis
+is line-based per function rather than a full interprocedural dataflow, so a
+helper function that itself performs additional state writes *after* a
+further-nested call it makes is not separately modeled beyond the 3-hop
+resolution depth. General multi-hop cross-contract reentrancy (tracing state
+across separately deployed contracts) is out of scope here and tracked in
+issue #66 — this analysis supplies the standards-aware implicit edges and
+callback-specific rules that feed into that broader picture.
 
 ---
 
@@ -460,6 +545,10 @@ interface Finding {
   snippet?: string;
   swcId?: string; // e.g. "SWC-107"
   llmEnhanced?: boolean;
+  callPath?: string[]; // e.g. ["safeMint", "_checkOnERC721Received"]
+  evidence?: Array<{ description: string; file?: string; line?: number }>;
+  assumptions?: string[];
+  confidence?: "high" | "medium" | "low";
 }
 ```
 
