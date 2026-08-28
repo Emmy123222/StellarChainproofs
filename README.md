@@ -12,6 +12,7 @@
 - [Repository Layout](#repository-layout)
 - [Installation](#installation)
 - [CLI Reference](#cli-reference)
+- [Governance Safety Analysis](#governance-safety-analysis)
 - [Invariant DSL](#invariant-dsl)
 - [Staking Accounting](#staking-accounting)
 - [VS Code Extension](#vs-code-extension)
@@ -303,6 +304,56 @@ chainproof invariants migrate legacy-spec.json --output vault.cpinv.json
 | `migrate <specFile>` | Upgrade a spec to the current schema version (`--write`, `--output <file>`) |
 
 `check` exits `1` if any invariant `fail`s or `error`s, `0` otherwise (`timeout`/`skipped` do not fail the build by themselves — inspect `bounded.timeExceeded`/`stepsExceededIds` in `--format json` output).
+
+### `chainproof governance`
+
+Run the bounded governance, timelock, multisig, and cross-chain proposal safety analyzer:
+
+```bash
+chainproof governance contracts/ --format markdown --output governance-report.md
+chainproof governance contracts/Governor.sol --format json --fail-on high
+chainproof governance contracts/ --include-rule CP-GOV-001 --include-rule CP-GOV-002
+chainproof governance contracts/ --config governance.config.json --include-models
+```
+
+The command emits deterministic, schema-versioned JSON or Markdown. `--fail-on` accepts
+`none|info|low|medium|high|critical`; the default is `high`. Rule include/exclude flags are
+repeatable, and bounded-analysis flags limit sources, files, contracts, functions, operations,
+evidence, and findings. See [Governance Safety Analysis](#governance-safety-analysis).
+
+---
+
+## Governance Safety Analysis
+
+The specialized engine in `packages/core/src/governance/` builds a normalized state-transition
+model for proposal creation, checkpointed voting, quorum math, queue/schedule, timelock delay,
+cancel, execute, multisig signature validation, emergency authority, upgrades, and cross-chain
+message delivery. It traces proposal-controlled target/value/calldata into privileged calls and
+checks guards and state writes in source order.
+
+It recognizes OpenZeppelin Governor and TimelockController shapes, Compound Governor Bravo,
+Safe-style threshold multisigs, cross-chain governors, and generic checkpoint/timelock patterns.
+The ordinary `chainproof scan` pipeline also runs these rules once per physical Solidity file.
+
+```typescript
+import {
+  analyzeGovernanceFiles,
+  serializeGovernanceReport,
+} from '@chainproof/core';
+
+const report = analyzeGovernanceFiles(['contracts/'], {
+  includeModels: true,
+  limits: { maxFindings: 200 },
+  excludeRules: ['CP-GOV-009'],
+});
+process.stdout.write(serializeGovernanceReport(report));
+```
+
+Reports describe structural implementation safety only. They do not judge voter preferences,
+political legitimacy, or whether a proposal's outcome is desirable. Full rule semantics,
+configuration schema, threat model, limitations, and troubleshooting are documented in
+**[docs/governance-safety.md](docs/governance-safety.md)**. Secure/vulnerable fixtures live under
+[`examples/contracts/governance/`](examples/contracts/governance/SecureGovernor.sol).
 
 ---
 

@@ -18,6 +18,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fee-on-transfer and rebasing assets, multiple rewards, emergency exits,
   recovery, and vesting boundaries. See
   [the staking accounting guide](docs/staking-accounting.md).
+- Production governance/timelock safety analysis (`packages/core/src/governance/`) with a
+  normalized proposal lifecycle and ordered state-transition model, explicit adapters for
+  OpenZeppelin Governor/TimelockController, Compound Governor Bravo, Safe-style multisigs, and
+  cross-chain receivers, plus 16 evidence-backed rules (`CP-GOV-001`–`CP-GOV-016`) covering
+  checkpointing, same-block voting power, quorum/window math, timelock readiness, replay,
+  proposal/operation identity, arbitrary calldata/value flow, guardian bypasses, delay updates,
+  predecessor/salt handling, role separation, upgrades, cross-chain domains, and threshold
+  signatures. Includes bounded deterministic APIs, versioned JSON/Markdown output, config v0→v1
+  migration, cancellation, `chainproof governance`, scanner integration, secure/vulnerable
+  fixtures, and regression tests. See [docs/governance-safety.md](docs/governance-safety.md).
 - Token callback/hook/reentrancy analysis (`@chainproof/core`
   `packages/core/src/rules/callback-analysis/`): models the implicit
   control-flow edges ERC-721/1155 receiver hooks, ERC-777 sender/receiver

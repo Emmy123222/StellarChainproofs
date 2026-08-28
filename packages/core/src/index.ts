@@ -209,6 +209,9 @@ export type {
   StakingSourceLocation,
   ValidatedStakingConfig,
 } from "./staking";
+
+// ─── Governance / timelock safety analysis ──────────────────────────────────
+export * from "./governance";
 export type {
   ParseSpecResult,
   MigrationResult,
