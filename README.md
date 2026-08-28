@@ -12,6 +12,7 @@
 - [Repository Layout](#repository-layout)
 - [Installation](#installation)
 - [CLI Reference](#cli-reference)
+- [Invariant DSL](#invariant-dsl)
 - [VS Code Extension](#vs-code-extension)
 - [GitHub Action](#github-action)
 - [Vulnerability Rules](#vulnerability-rules)
@@ -279,6 +280,46 @@ chainproof threat-model contracts/ --assumptions assumptions.json --min-severity
 | `--min-severity <level>` | `low` | Filter prioritized threats below this level (critical\|high\|medium\|low) |
 | `--format <format>` | `markdown` | Output format: `markdown` or `json` |
 | `--output <file>` | stdout | Write threat model report to file |
+
+### `chainproof invariants`
+
+Deterministic security invariant specification and checking DSL — see [Invariant DSL](#invariant-dsl) below for the full spec format and semantics.
+
+```bash
+chainproof invariants init vault.cpinv.json --contract Vault
+chainproof invariants validate vault.cpinv.json
+chainproof invariants check vault.cpinv.json contracts/Vault.sol --format json
+chainproof invariants explain vault.cpinv.json VAULT-ACCESS-001
+chainproof invariants migrate legacy-spec.json --output vault.cpinv.json
+```
+
+| Subcommand | Description |
+| --- | --- |
+| `init <specFile>` | Scaffold a starter spec (`--contract <name>`, `--force`) |
+| `validate <specFile>` | Parse + schema/type-check a spec without checking any contract (`--format table\|json`) |
+| `check <specFile> <targets...>` | Evaluate a spec against `.sol` targets (`--format`, `--output`, `--max-steps`, `--max-time-ms`) |
+| `explain <specFile> <id>` | Print an invariant's resolved scope, expanded condition, and assumptions |
+| `migrate <specFile>` | Upgrade a spec to the current schema version (`--write`, `--output <file>`) |
+
+`check` exits `1` if any invariant `fail`s or `error`s, `0` otherwise (`timeout`/`skipped` do not fail the build by themselves — inspect `bounded.timeExceeded`/`stepsExceededIds` in `--format json` output).
+
+---
+
+## Invariant DSL
+
+A versioned, declarative JSON DSL (`packages/core/src/dsl/`, exported from `@chainproof/core`) for expressing protocol-specific security invariants — access control, state, arithmetic, call ordering, events, value-flow, and cross-function properties — that generic detectors can't know about, and checking them deterministically against Solidity source via bounded AST/call-graph queries (never a live network, and never a symbolic executor or SMT solver).
+
+```typescript
+import { parseInvariantSpecFile, checkInvariants } from '@chainproof/core';
+
+const { spec, diagnostics } = parseInvariantSpecFile('vault.cpinv.json');
+if (spec) {
+  const report = await checkInvariants(spec, { targets: ['contracts/Vault.sol'] });
+  console.log(report.summary); // { pass, fail, error, timeout, skipped, total }
+}
+```
+
+See **[docs/invariant-dsl.md](docs/invariant-dsl.md)** for the full spec format, the condition expression grammar, semantics of each invariant kind, the diagnostic code reference, the threat model/limitations, and troubleshooting. Working examples live in [`examples/invariant-specs/vault.cpinv.json`](examples/invariant-specs/vault.cpinv.json) checked against the secure/vulnerable fixture pair, [`SecureVaultInvariants.sol`](examples/contracts/invariants/SecureVaultInvariants.sol) and [`VulnerableVaultInvariants.sol`](examples/contracts/invariants/VulnerableVaultInvariants.sol).
 
 ---
 

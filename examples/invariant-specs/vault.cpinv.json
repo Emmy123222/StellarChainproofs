@@ -1,0 +1,81 @@
+{
+  "schemaVersion": "1.0.0",
+  "name": "vault-core-invariants",
+  "description": "Core security invariants for the example Vault contract (see examples/contracts/invariants/).",
+  "predicates": {
+    "isOwner": "msg.sender == owner"
+  },
+  "invariants": [
+    {
+      "id": "VAULT-ACCESS-001",
+      "kind": "access",
+      "title": "Only the owner may adjust reserves",
+      "description": "adjustAssets changes the accounted reserve balance and must be owner-gated.",
+      "severity": "high",
+      "scope": { "contract": "Vault", "function": "adjustAssets" },
+      "condition": "isOwner()",
+      "assumptions": ["'owner' is set once in the constructor and is never the zero address"],
+      "references": ["SWC-105"]
+    },
+    {
+      "id": "VAULT-STATE-001",
+      "kind": "state",
+      "title": "Reserves must never fall below outstanding debt",
+      "severity": "critical",
+      "scope": { "contract": "Vault" },
+      "condition": "totalAssets >= totalDebt",
+      "assumptions": ["totalAssets/totalDebt are only ever mutated by contract functions, never by direct storage writes elsewhere"],
+      "references": []
+    },
+    {
+      "id": "VAULT-ARITH-001",
+      "kind": "arithmetic",
+      "title": "borrow() cannot create undercollateralized debt",
+      "severity": "critical",
+      "scope": { "contract": "Vault", "function": "borrow" },
+      "condition": "totalAssets >= totalDebt + amount",
+      "assumptions": [],
+      "references": ["SWC-101"]
+    },
+    {
+      "id": "VAULT-ORDER-001",
+      "kind": "call-order",
+      "title": "Balance is debited before the external transfer (checks-effects-interactions)",
+      "severity": "critical",
+      "scope": { "contract": "Vault", "function": "withdraw" },
+      "order": { "before": "_recordWithdrawal", "after": "<external-call>" },
+      "assumptions": [],
+      "references": ["SWC-107"]
+    },
+    {
+      "id": "VAULT-EVENT-001",
+      "kind": "event",
+      "title": "withdraw() always emits Withdrawn",
+      "severity": "low",
+      "scope": { "contract": "Vault", "function": "withdraw" },
+      "event": "Withdrawn",
+      "assumptions": [],
+      "references": []
+    },
+    {
+      "id": "VAULT-FLOW-001",
+      "kind": "value-flow",
+      "title": "adjustAssets() validates its delta before writing to totalAssets",
+      "severity": "medium",
+      "scope": { "contract": "Vault", "function": "adjustAssets" },
+      "condition": "totalAssets >= totalDebt",
+      "assumptions": ["'delta' is the only externally-controlled input to this function"],
+      "references": []
+    },
+    {
+      "id": "VAULT-XFN-001",
+      "kind": "cross-function",
+      "title": "Every function reachable from borrow() that touches reserves is guarded",
+      "severity": "high",
+      "scope": { "contract": "Vault", "function": "borrow" },
+      "condition": "totalAssets >= totalDebt",
+      "assumptions": [],
+      "references": []
+    }
+  ]
+}
