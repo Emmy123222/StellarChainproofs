@@ -27,6 +27,7 @@ import {
   checkERC1155Compliance,
 } from "./rules/erc-compliance";
 import { detectVaultInflation } from "./rules/cp122-vault-inflation";
+import { detectCallbackReentrancy } from "./rules/callback-analysis";
 import { RuleOptions } from "./rules/rule-context";
 import { detectGasIssues } from "./rules/gas-optimizer";
 import { enhanceFindingsWithLLM } from "./llm/enhancer";
@@ -99,6 +100,7 @@ function runRulesOnView(
     ...detectUncheckedReturn(view.node, view.source, view.file),
     ...runERCChecks(view.node, view.source, view.file, ruleOptions),
     ...detectVaultInflation(view.node, view.source, view.file, ruleOptions),
+    ...detectCallbackReentrancy(view.node, view.source, view.file, ruleOptions),
   ];
 }
 

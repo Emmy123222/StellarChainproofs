@@ -9,23 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Deterministic Security Invariant Specification and Checking DSL**
-  (`packages/core/src/dsl/`, `chainproof invariants`): a versioned,
-  declarative JSON DSL for expressing protocol-specific security invariants
-  — `access`, `state`, `arithmetic`, `call-order`, `event`, `value-flow`,
-  and `cross-function` — with a small deterministic condition-expression
-  language, JSON-schema + type validation, source binding against the same
-  inheritance/import-resolved contract views the rest of ChainProof uses
-  (overload disambiguation via `scope.signature`), reusable predicates with
-  cycle detection, and bounded AST/call-graph evaluation (per-invariant
-  step budget, total wall-clock budget, deterministic result ordering by
-  invariant id). Evidence and counterexamples carry exact source ranges.
-  New public API: `parseInvariantSpecFile`, `validateInvariantSpecFile`,
-  `checkInvariants`, `checkInvariantsFromFile`, `explainInvariant`,
-  `migrateInvariantSpecFile`, `scaffoldInvariantSpec`, `serializeReport`.
-  New CLI: `chainproof invariants init|validate|check|explain|migrate`.
-  See [docs/invariant-dsl.md](docs/invariant-dsl.md).
-
+- Token callback/hook/reentrancy analysis (`@chainproof/core`
+  `packages/core/src/rules/callback-analysis/`): models the implicit
+  control-flow edges ERC-721/1155 receiver hooks, ERC-777 sender/receiver
+  hooks, ERC-3156-style flash-loan callbacks, legacy ERC-223
+  `tokenFallback`, and project-defined callback registries introduce, and
+  detects incomplete state before the callback (`CP-CB-CEI`), cross-function
+  reentrancy through it (`CP-CB-CROSSFN`), read-only reentrancy exposed via a
+  `view` function (`CP-CB-READONLY`), unauthenticated callback spoofing
+  (`CP-CB-SPOOF`), and unbounded batch callbacks (`CP-CB-BATCH`). Recognizes
+  reentrancy-guard modifiers, hand-rolled mutexes, trusted-receiver
+  allowlists, EOA-only checks, and flash-callback repayment invariants as
+  suppressing guards. Findings carry `evidence`, `assumptions`, and
+  `confidence`. See the [README](README.md#callback-hook--reentrancy-analysis-cp-90)
+  for the full threat model and known limitations.
 - Public API surface audit for `@chainproof/core`: every export is now categorized
   as public/stable or `@internal`, and the internal-only helpers (`parseSolidity`,
   `visit`, `runSlither`) are explicitly tagged as such.

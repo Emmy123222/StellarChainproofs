@@ -69,6 +69,54 @@ export const RULES: RuleMeta[] = [
       "initialization, exposing later depositors to first-depositor donation attacks.",
   },
   {
+    id: "CP-CB-CEI",
+    title: "Incomplete state update before standards-driven callback",
+    severity: "critical",
+    category: "security",
+    description:
+      "Detects ERC-721/1155/777 receiver/sender hooks and ERC-3156-style flash-loan callbacks fired " +
+      "while contract state is still unfinalized (or, for flash callbacks, with no post-callback " +
+      "repayment invariant check) — a Checks-Effects-Interactions violation invisible to raw " +
+      "external-call detection.",
+  },
+  {
+    id: "CP-CB-CROSSFN",
+    title: "Cross-function reentrancy via callback",
+    severity: "critical",
+    category: "security",
+    description:
+      "Detects a sibling function reading or writing state that the callback-triggering function left " +
+      "stale across a standards-driven callback, allowing an attacker to re-enter through that sibling.",
+  },
+  {
+    id: "CP-CB-READONLY",
+    title: "Read-only reentrancy via callback",
+    severity: "high",
+    category: "security",
+    description:
+      "Detects a `view` function exposing a value (e.g. a share/exchange price) that is only finalized " +
+      "after a standards-driven callback fires, letting an integrator read a stale value mid-callback.",
+  },
+  {
+    id: "CP-CB-SPOOF",
+    title: "Callback spoofing",
+    severity: "high",
+    category: "security",
+    description:
+      "Detects a receiver-hook-shaped function (onERC721Received, tokensReceived, a project-defined " +
+      "onXHook, ...) that mutates sensitive state without verifying msg.sender is the expected " +
+      "token/vault/operator contract.",
+  },
+  {
+    id: "CP-CB-BATCH",
+    title: "Unbounded batch callback",
+    severity: "medium",
+    category: "security",
+    description:
+      "Detects a standards-driven callback fired once per loop iteration over a caller-supplied array " +
+      "with no explicit length cap, multiplying the reentrancy surface and enabling gas-griefing DoS.",
+  },
+  {
     id: "GAS-LOOP-STORAGE",
     title: "Storage read inside loop",
     severity: "gas",
