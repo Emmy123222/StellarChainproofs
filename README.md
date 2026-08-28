@@ -13,6 +13,7 @@
 - [Installation](#installation)
 - [CLI Reference](#cli-reference)
 - [Invariant DSL](#invariant-dsl)
+- [Staking Accounting](#staking-accounting)
 - [VS Code Extension](#vs-code-extension)
 - [GitHub Action](#github-action)
 - [Vulnerability Rules](#vulnerability-rules)
@@ -302,6 +303,26 @@ chainproof invariants migrate legacy-spec.json --output vault.cpinv.json
 | `migrate <specFile>` | Upgrade a spec to the current schema version (`--write`, `--output <file>`) |
 
 `check` exits `1` if any invariant `fail`s or `error`s, `0` otherwise (`timeout`/`skipped` do not fail the build by themselves — inspect `bounded.timeExceeded`/`stepsExceededIds` in `--format json` output).
+
+---
+
+## Staking Accounting
+
+Run the dedicated deterministic analysis for stake shares, accumulated reward
+indexes, epochs, fee-on-transfer/rebasing assets, emergency exits, reward-token
+recovery, and vesting cliffs:
+
+```bash
+chainproof staking contracts/ --format markdown --output staking-report.md
+chainproof staking contracts/ --format json --fail-on none
+```
+
+The output uses schema `1.0.0` and includes precise source locations, ordered
+evidence, assumptions, and confidence. It has no live-network dependency and
+does not estimate investment yield. See
+[the staking accounting guide](docs/staking-accounting.md) for APIs, rules,
+configuration migration, threat model, resource limits, compatibility, fixture
+coverage, rule-author guidance, and troubleshooting.
 
 ---
 

@@ -7,7 +7,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
+    "build": "npm run build --workspace=packages/core && npm run build --workspace=packages/server && npm run build --workspace=packages/cli && npm run build --workspace=packages/hardhat-plugin && npm run build --workspace=packages/vscode-extension && npm run build --workspace=packages/github-action",
     "test": "npm run test --workspaces --if-present",
     "lint": "eslint packages/*/src/**/*.ts",
     "dev:cli": "npm run dev --workspace=packages/cli"

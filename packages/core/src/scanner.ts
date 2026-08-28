@@ -28,6 +28,7 @@ import {
 } from "./rules/erc-compliance";
 import { detectVaultInflation } from "./rules/cp122-vault-inflation";
 import { detectCallbackReentrancy } from "./rules/callback-analysis";
+import { detectStakingAccounting } from "./staking";
 import { RuleOptions } from "./rules/rule-context";
 import { detectGasIssues } from "./rules/gas-optimizer";
 import { enhanceFindingsWithLLM } from "./llm/enhancer";
@@ -172,6 +173,11 @@ async function scanFile(
           ...detectUncheckedReturn(ast, source, filePath),
         ]
       : runRulesOnFile(ast, source, filePath);
+
+  // Staking accounting is intentionally evaluated once per physical source
+  // file. Its model already separates contracts, so running it per merged
+  // inheritance view would duplicate evidence and findings.
+  findings.push(...detectStakingAccounting(ast, source, filePath));
 
   if (config.plugins) {
     for (const plugin of config.plugins) {
